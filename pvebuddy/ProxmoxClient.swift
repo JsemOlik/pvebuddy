@@ -278,6 +278,34 @@ final class ProxmoxClient {
     return VMCurrentStatus(status: status, cpuFraction: cpuFraction, memUsed: memUsed, memMax: memMax)
   }
 
+  // MARK: - VM Time-series (RRD)
+
+  struct RRDEntry: Decodable {
+    let time: Int64
+    let cpu: Double?
+    let mem: Double?
+    let maxmem: Double?
+  }
+  private struct RRDResponse: Decodable { let data: [RRDEntry] }
+
+  func fetchVMRRD(node: String, vmid: String, timeframe: String = "hour", cf: String = "AVERAGE") async throws -> [RRDEntry] {
+    let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
+    let vmidEnc = vmid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? vmid
+    let url = try makeURL(path: "/api2/json/nodes/\(nodeEnc)/qemu/\(vmidEnc)/rrd?timeframe=\(timeframe)&cf=\(cf)")
+    let (data, resp) = try await dataGET(url)
+    try ensureOK(resp, data)
+    return try JSONDecoder().decode(RRDResponse.self, from: data).data
+  }
+
+  // Optional: Node RRD if you later need time-series at node level
+  func fetchNodeRRD(node: String, timeframe: String = "hour", cf: String = "AVERAGE") async throws -> [RRDEntry] {
+    let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
+    let url = try makeURL(path: "/api2/json/nodes/\(nodeEnc)/rrd?timeframe=\(timeframe)&cf=\(cf)")
+    let (data, resp) = try await dataGET(url)
+    try ensureOK(resp, data)
+    return try JSONDecoder().decode(RRDResponse.self, from: data).data
+  }
+
   // MARK: - Power Actions
 
   func startVM(node: String, vmid: String) async throws {
@@ -323,6 +351,30 @@ final class ProxmoxClient {
     } catch { throw ProxmoxClientError.decodingFailed(underlying: error) }
   }
 
+  // MARK: - VM Config Update (Resources)
+
+  func updateVMResources(
+    node: String,
+    vmid: String,
+    cores: Int?,
+    sockets: Int?,
+    memoryMiB: Int?,
+    balloonMiB: Int?
+  ) async throws {
+    let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
+    let vmidEnc = vmid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? vmid
+    let url = try makeURL(path: "/api2/json/nodes/\(nodeEnc)/qemu/\(vmidEnc)/config")
+
+    var form: [String: String] = [:]
+    if let cores { form["cores"] = String(cores) }
+    if let sockets { form["sockets"] = String(sockets) }
+    if let memoryMiB { form["memory"] = String(memoryMiB) }
+    if let balloonMiB { form["balloon"] = String(balloonMiB) }
+
+    let (data, resp) = try await dataPOSTForm(url, form: form)
+    try ensureOK(resp, data)
+  }
+
   // MARK: - Web Login (Browser Ticket)
 
   struct LoginTicketResponse: Decodable {
@@ -334,8 +386,6 @@ final class ProxmoxClient {
     }
   }
 
-  /// Obtain a browser ticket (PVEAuthCookie) for the Proxmox Web UI.
-  /// Requires a real username@realm and password (API tokens do not work here).
   func loginForWebTicket(username: String, password: String, realm: String = "pam") async throws -> (ticket: String, csrf: String?) {
     let url = try makeURL(path: "/api2/json/access/ticket")
 
@@ -435,7 +485,6 @@ final class ProxmoxClient {
   }
 }
 
-// JSONAny helper can live outside the client
 struct JSONAny: Decodable {
   let value: Any
   var string: String? { value as? String }

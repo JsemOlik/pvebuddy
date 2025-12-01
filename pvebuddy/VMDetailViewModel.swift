@@ -15,6 +15,18 @@ final class VMDetailViewModel: ObservableObject {
   @Published var memMax: Int64 = 0
   @Published var displayedUptime: Int64 = 0
 
+  struct ChartPoint: Identifiable {
+    let id = UUID()
+    let date: Date
+    let cpuPercent: Double
+    let memUsedBytes: Int64
+    let memTotalBytes: Int64
+  }
+  @Published var chartPoints: [ChartPoint] = []
+  private let maxChartSeconds: TimeInterval = 120
+
+  @Published var nodeStatus: ProxmoxNodeStatus?
+
   @Published var hardware: [HardwareSection] = []
   @Published var hardwareLoading: Bool = false
   @Published var hardwareError: String?
@@ -43,6 +55,8 @@ final class VMDetailViewModel: ObservableObject {
     autoRefreshTask?.cancel()
     autoRefreshTask = Task { [weak self] in
       guard let self else { return }
+      await self.backfillVMChart()
+      await self.loadNodeStatus()
       while !Task.isCancelled {
         await self.refreshLive()
         if self.liveStatus.lowercased() == "running" {
@@ -53,6 +67,9 @@ final class VMDetailViewModel: ObservableObject {
         self.detailRefreshTick += 1
         if self.detailRefreshTick % 3 == 0 {
           await self.refreshDetails()
+        }
+        if self.detailRefreshTick % 10 == 0 {
+          await self.loadNodeStatus()
         }
         try? await Task.sleep(for: .seconds(1))
       }
@@ -67,6 +84,54 @@ final class VMDetailViewModel: ObservableObject {
   func refresh() async {
     await refreshDetails()
     await refreshLive()
+    await loadNodeStatus()
+  }
+
+  // expose live node refresh for EditResourcesSheet ticker
+  func loadNodeStatus() async {
+    do {
+      self.nodeStatus = try await client.fetchStatus(for: initialVM.node)
+    } catch { }
+  }
+
+  private func trimChart() {
+    let cutoff = Date().addingTimeInterval(-maxChartSeconds)
+    chartPoints.removeAll { $0.date < cutoff }
+  }
+
+  private func appendLivePoint() {
+    let point = ChartPoint(
+      date: Date(),
+      cpuPercent: max(0, min(100, cpuPercent)),
+      memUsedBytes: memUsed,
+      memTotalBytes: memMax
+    )
+    chartPoints.append(point)
+    trimChart()
+  }
+
+  private func backfillVMChart() async {
+    do {
+      let entries = try await client.fetchVMRRD(
+        node: initialVM.node,
+        vmid: initialVM.vmid,
+        timeframe: "hour",
+        cf: "AVERAGE"
+      )
+      let now = Date()
+      let cutoff = now.addingTimeInterval(-maxChartSeconds)
+      let filtered = entries.filter { Date(timeIntervalSince1970: TimeInterval($0.time)) >= cutoff }
+      var pts: [ChartPoint] = []
+      for e in filtered {
+        let d = Date(timeIntervalSince1970: TimeInterval(e.time))
+        let cpuPct = max(0.0, min(100.0, (e.cpu ?? 0.0) * 100.0))
+        let usedBytes = Int64(e.mem ?? 0.0)
+        let totalBytes = Int64(e.maxmem ?? Double(self.memMax))
+        pts.append(ChartPoint(date: d, cpuPercent: cpuPct, memUsedBytes: usedBytes, memTotalBytes: totalBytes))
+      }
+      self.chartPoints = pts.sorted { $0.date < $1.date }
+      trimChart()
+    } catch { }
   }
 
   private func refreshDetails() async {
@@ -124,9 +189,8 @@ final class VMDetailViewModel: ObservableObject {
         netout: self.vm.netout,
         tags: self.vm.tags
       )
-    } catch {
-      // ignore transient errors
-    }
+      appendLivePoint()
+    } catch { }
   }
 
   func shutdown(forceOnFailure: Bool = false) async {
@@ -274,5 +338,23 @@ final class VMDetailViewModel: ObservableObject {
       if p.contains("windows") || p.contains("win11") || p.contains("win10") { return "distro_windows" }
     }
     return nil
+  }
+
+  // MARK: - Resource updates
+
+  func updateResources(newCores: Int?, newSockets: Int?, newMemoryMiB: Int?, newBalloonMiB: Int?) async -> String? {
+    await withActionState { [weak self] in
+      guard let self else { return }
+      try await self.client.updateVMResources(
+        node: self.initialVM.node,
+        vmid: self.initialVM.vmid,
+        cores: newCores,
+        sockets: newSockets,
+        memoryMiB: newMemoryMiB,
+        balloonMiB: newBalloonMiB
+      )
+      await self.refresh()
+    }
+    return self.errorMessage
   }
 }
