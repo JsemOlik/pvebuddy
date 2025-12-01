@@ -4,74 +4,275 @@ import Combine
 
 @MainActor
 final class VMDetailViewModel: ObservableObject {
-    @Published var vm: ProxmoxVM
-    @Published var isLoading: Bool = false
-    @Published var errorMessage: String?
+  @Published var vm: ProxmoxVM
+  @Published var isLoading: Bool = false
+  @Published var errorMessage: String?
+  @Published var isActing: Bool = false
 
-    private let client: ProxmoxClient
-    private let initialVM: ProxmoxVM
-    private var autoRefreshTask: Task<Void, Never>?
+  @Published var liveStatus: String = "unknown"
+  @Published var cpuPercent: Double = 0.0
+  @Published var memUsed: Int64 = 0
+  @Published var memMax: Int64 = 0
+  @Published var displayedUptime: Int64 = 0
 
-    init(vm: ProxmoxVM, serverAddress: String) {
-        self.initialVM = vm
-        self.vm = vm
-        self.client = ProxmoxClient(baseAddress: serverAddress)
-    }
+  @Published var hardware: [HardwareSection] = []
+  @Published var hardwareLoading: Bool = false
+  @Published var hardwareError: String?
 
-    deinit {
-        autoRefreshTask?.cancel()
-    }
+  struct HardwareItem: Identifiable { let id = UUID(); let key: String; let value: String }
+  struct HardwareSection: Identifiable { let id = UUID(); let title: String; let items: [HardwareItem] }
 
-    func startAutoRefresh() {
-        NSLog("🚀 VMDetailViewModel.startAutoRefresh() called for VM %@", initialVM.vmid)
-        autoRefreshTask?.cancel()
-        autoRefreshTask = Task {
-            NSLog("🔁 VM detail auto-refresh task started")
-            while !Task.isCancelled {
-                NSLog("⏱️ VM detail auto-refresh tick for VM %@", self.initialVM.vmid)
-                await self.refresh()
-                try? await Task.sleep(for: .seconds(3))
-            }
-            NSLog("🛑 VM detail auto-refresh task cancelled")
+  private let client: ProxmoxClient
+  private let initialVM: ProxmoxVM
+  private var autoRefreshTask: Task<Void, Never>?
+  private var detailRefreshTick: Int = 0
+
+  init(vm: ProxmoxVM, serverAddress: String) {
+    self.initialVM = vm
+    self.vm = vm
+    self.client = ProxmoxClient(baseAddress: serverAddress)
+    self.liveStatus = vm.status
+    self.memUsed = vm.mem
+    self.memMax = vm.maxmem
+    self.displayedUptime = vm.uptime ?? 0
+  }
+
+  deinit { autoRefreshTask?.cancel() }
+
+  func startAutoRefresh() {
+    autoRefreshTask?.cancel()
+    autoRefreshTask = Task { [weak self] in
+      guard let self else { return }
+      while !Task.isCancelled {
+        await self.refreshLive()
+        if self.liveStatus.lowercased() == "running" {
+          withAnimation(.linear(duration: 0.2)) {
+            self.displayedUptime += 1
+          }
         }
-    }
-
-    func stopAutoRefresh() {
-        NSLog("🛑 VMDetailViewModel.stopAutoRefresh() called for VM %@", initialVM.vmid)
-        autoRefreshTask?.cancel()
-        autoRefreshTask = nil
-    }
-
-    func refresh() async {
-        guard !isLoading else { return }
-        isLoading = true
-        errorMessage = nil
-
-        NSLog("🔄 VMDetailViewModel.refresh() started for VM %@", initialVM.vmid)
-
-        do {
-            let detail = try await client.fetchVMDetail(node: initialVM.node, vmid: initialVM.vmid)
-            
-            // Update the VM with fresh data while keeping the initial node/name/status
-            self.vm = ProxmoxVM(
-                vmid: initialVM.vmid,
-                name: initialVM.name,
-                node: initialVM.node,
-                status: initialVM.status,
-                cpus: detail.cpus,
-                maxmem: detail.maxmem,
-                mem: detail.mem,
-                uptime: detail.uptime,
-                netin: detail.netin,
-                netout: detail.netout
-            )
-            NSLog("✅ VM detail refreshed for VM %@", initialVM.vmid)
-        } catch {
-            NSLog("❌ Failed to refresh VM detail: %@", "\(error)")
-            errorMessage = "Failed to refresh VM details: \(error.localizedDescription)"
+        self.detailRefreshTick += 1
+        if self.detailRefreshTick % 3 == 0 {
+          await self.refreshDetails()
         }
-
-        isLoading = false
-        NSLog("🔄 VMDetailViewModel.refresh() completed for VM %@", initialVM.vmid)
+        try? await Task.sleep(for: .seconds(1))
+      }
     }
+  }
+
+  func stopAutoRefresh() {
+    autoRefreshTask?.cancel()
+    autoRefreshTask = nil
+  }
+
+  func refresh() async {
+    await refreshDetails()
+    await refreshLive()
+  }
+
+  private func refreshDetails() async {
+    guard !isLoading else { return }
+    isLoading = true
+    defer { isLoading = false }
+    do {
+      let detail = try await self.client.fetchVMDetail(
+        node: self.initialVM.node,
+        vmid: self.initialVM.vmid
+      )
+      self.vm = ProxmoxVM(
+        vmid: self.initialVM.vmid,
+        name: self.initialVM.name,
+        node: self.initialVM.node,
+        status: self.liveStatus,
+        cpus: detail.cpus,
+        maxmem: detail.maxmem,
+        mem: detail.mem,
+        uptime: detail.uptime,
+        netin: detail.netin,
+        netout: detail.netout,
+        tags: self.vm.tags
+      )
+      self.memMax = detail.maxmem
+      self.memUsed = detail.mem
+      if let up = detail.uptime { self.displayedUptime = up }
+    } catch {
+      self.errorMessage = "Failed to refresh VM details: \(error.localizedDescription)"
+    }
+  }
+
+  private func refreshLive() async {
+    do {
+      let s = try await self.client.fetchVMCurrentStatus(
+        node: self.initialVM.node,
+        vmid: self.initialVM.vmid
+      )
+      self.liveStatus = s.status
+      self.cpuPercent = max(0, min(100, s.cpuFraction * 100.0))
+      if s.memMax > 0 {
+        self.memUsed = s.memUsed
+        self.memMax = s.memMax
+      }
+      self.vm = ProxmoxVM(
+        vmid: self.vm.vmid,
+        name: self.vm.name,
+        node: self.vm.node,
+        status: self.liveStatus,
+        cpus: self.vm.cpus,
+        maxmem: self.vm.maxmem,
+        mem: self.memUsed,
+        uptime: self.vm.uptime,
+        netin: self.vm.netin,
+        netout: self.vm.netout,
+        tags: self.vm.tags
+      )
+    } catch {
+      // ignore transient errors
+    }
+  }
+
+  func shutdown(forceOnFailure: Bool = false) async {
+    await withActionState { [weak self] in
+      guard let self else { return }
+      try await self.client.shutdownVM(
+        node: self.initialVM.node,
+        vmid: self.initialVM.vmid,
+        force: forceOnFailure,
+        timeout: 60
+      )
+      await self.refresh()
+    }
+  }
+
+  func reboot() async {
+    await withActionState { [weak self] in
+      guard let self else { return }
+      try await self.client.rebootVM(node: self.initialVM.node, vmid: self.initialVM.vmid)
+      await self.refresh()
+    }
+  }
+
+  func start() async {
+    await withActionState { [weak self] in
+      guard let self else { return }
+      try await self.client.startVM(node: self.initialVM.node, vmid: self.initialVM.vmid)
+      await self.refresh()
+    }
+  }
+
+  func forceStop() async {
+    await withActionState { [weak self] in
+      guard let self else { return }
+      try await self.client.stopVM(node: self.initialVM.node, vmid: self.initialVM.vmid)
+      await self.refresh()
+    }
+  }
+
+  private func withActionState(_ work: @escaping () async throws -> Void) async {
+    self.isActing = true
+    self.errorMessage = nil
+    defer { self.isActing = false }
+    do {
+      try await work()
+    } catch let e as ProxmoxClientError {
+      switch e {
+      case .requestFailed(let code, let message):
+        self.errorMessage = "Action failed (HTTP \(code)): \(message)"
+      case .invalidURL:
+        self.errorMessage = "Invalid server URL."
+      case .decodingFailed(let underlying):
+        self.errorMessage = "Decoding failed: \(underlying.localizedDescription)"
+      case .noNodesFound:
+        self.errorMessage = "No nodes found."
+      }
+    } catch {
+      self.errorMessage = "Unexpected error: \(error.localizedDescription)"
+    }
+  }
+
+  func loadHardware() async {
+    guard !hardwareLoading else { return }
+    hardwareLoading = true
+    hardwareError = nil
+    defer { hardwareLoading = false }
+
+    do {
+      let cfg = try await self.client.fetchVMConfig(
+        node: self.initialVM.node,
+        vmid: self.initialVM.vmid
+      )
+      self.hardware = Self.groupConfig(cfg)
+    } catch {
+      self.hardware = []
+      self.hardwareError = "Failed to load hardware: \(error.localizedDescription)"
+    }
+  }
+
+  private static func groupConfig(_ cfg: [String: String]) -> [HardwareSection] {
+    func items(_ pairs: [(String, String)]) -> [HardwareItem] { pairs.map { HardwareItem(key: $0.0, value: $0.1) } }
+    var sections: [HardwareSection] = []
+
+    let cpuMemKeys = ["sockets","cores","vcpus","cpulimit","cpu","numa","memory","balloon","machine","bios","agent"]
+    let cpuMem = cpuMemKeys.compactMap { k in cfg[k].map { (k, $0) } }
+    if !cpuMem.isEmpty { sections.append(HardwareSection(title: "CPU & Memory", items: items(cpuMem))) }
+
+    let bootKeys = ["onboot", "boot", "bootdisk"]
+    let boot = bootKeys.compactMap { k in cfg[k].map { (k, $0) } }
+    if !boot.isEmpty { sections.append(HardwareSection(title: "Boot", items: items(boot))) }
+
+    let diskPrefixes = ["scsi","sata","ide","virtio","efidisk","tpmstate","unused"]
+    let diskPairs = cfg.keys.filter { key in diskPrefixes.contains { key.hasPrefix($0) } }
+      .sorted().compactMap { k in cfg[k].map { (k, $0) } }
+    if !diskPairs.isEmpty { sections.append(HardwareSection(title: "Disks", items: items(diskPairs))) }
+
+    let netPairs = cfg.keys.filter { $0.hasPrefix("net") }.sorted().compactMap { k in cfg[k].map { (k, $0) } }
+    if !netPairs.isEmpty { sections.append(HardwareSection(title: "Network", items: items(netPairs))) }
+
+    let displayKeys = ["vga", "video", "serial", "display"]
+    let display = displayKeys.compactMap { k in cfg[k].map { (k, $0) } }
+    if !display.isEmpty { sections.append(HardwareSection(title: "Display", items: items(display))) }
+
+    let controllerKeys = ["scsihw", "rng0", "smbios1", "args", "agent", "tablet", "keyboard"]
+    let controller = controllerKeys.compactMap { k in cfg[k].map { (k, $0) } }
+    if !controller.isEmpty { sections.append(HardwareSection(title: "Controllers & Misc", items: items(controller))) }
+
+    let pciPairs = cfg.keys.filter { $0.hasPrefix("hostpci") }.sorted().compactMap { k in cfg[k].map { (k, $0) } }
+    if !pciPairs.isEmpty { sections.append(HardwareSection(title: "PCI Passthrough", items: items(pciPairs))) }
+
+    let cloudKeys = ["cicustom","ciuser","cipassword","citype","ipconfig0","ipconfig1"]
+    var cloud = cloudKeys.compactMap { k in cfg[k].map { (k, $0) } }
+    if let ide2 = cfg["ide2"], ide2.contains("cloudinit") { cloud.append(("ide2", ide2)) }
+    if !cloud.isEmpty { sections.append(HardwareSection(title: "Cloud-Init", items: items(cloud))) }
+
+    let usedKeys = Set(sections.flatMap { $0.items.map { $0.key } })
+    let otherPairs = cfg.keys.filter { !usedKeys.contains($0) }.sorted().compactMap { k in cfg[k].map { (k, $0) } }
+    if !otherPairs.isEmpty { sections.append(HardwareSection(title: "Other", items: items(otherPairs))) }
+
+    return sections
+  }
+
+  func distroImageName(from tags: String?) -> String? {
+    guard let tags, !tags.isEmpty else { return nil }
+    let parts = tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+    for p in parts {
+      if p.contains("ubuntu") { return "distro_ubuntu" }
+      if p.contains("debian") { return "distro_debian" }
+      if p.contains("arch") { return "distro_arch" }
+      if p.contains("fedora") { return "distro_fedora" }
+      if p.contains("nixos") || p.contains("nix os") { return "distro_nixos" }
+      if p.contains("centos") { return "distro_centos" }
+      if p.contains("rocky") { return "distro_rocky" }
+      if p.contains("alma") { return "distro_alma" }
+      if p.contains("opensuse") || p.contains("open suse") || p.contains("suse") { return "distro_opensuse" }
+      if p.contains("kali") { return "distro_kali" }
+      if p.contains("pop") { return "distro_popos" }
+      if p.contains("mint") { return "distro_mint" }
+      if p.contains("manjaro") { return "distro_manjaro" }
+      if p.contains("gentoo") { return "distro_gentoo" }
+      if p.contains("alpine") { return "distro_alpine" }
+      if p.contains("rhel") || p.contains("redhat") || p.contains("red hat") { return "distro_rhel" }
+      if p.contains("oracle") { return "distro_oracle" }
+      if p.contains("freebsd") { return "distro_freebsd" }
+      if p.contains("windows") || p.contains("win11") || p.contains("win10") { return "distro_windows" }
+    }
+    return nil
+  }
 }
