@@ -23,7 +23,7 @@ struct DashboardView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     header
-                    // Node selector (clear label + helper text)
+
                     if !viewModel.nodeNames.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack(spacing: 12) {
@@ -46,6 +46,7 @@ struct DashboardView: View {
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
+                        // iOS 17+ preferred onChange overload:
                         .onChange(of: viewModel.selectedNode) { newValue in
                             viewModel.isDatacenter = newValue == nil
                             Task { await viewModel.refresh() }
@@ -131,15 +132,13 @@ struct DashboardView: View {
                 .presentationDragIndicator(.visible)
         }
         .alert("Reboot node?", isPresented: $showRebootConfirm) {
-            Button("Reboot", role: .destructive) {
-            }
+            Button("Reboot", role: .destructive) { }
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Are you sure you want to reboot this node?")
         }
         .alert("Shut down node?", isPresented: $showShutdownConfirm) {
-            Button("Shut Down", role: .destructive) {
-            }
+            Button("Shut Down", role: .destructive) { }
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Are you sure you want to shut down this node?")

@@ -29,6 +29,13 @@ struct SettingsView: View {
                 } label: {
                     Label("Edit server info", systemImage: "server.rack")
                 }
+
+                // NEW: Web Console Login
+                NavigationLink {
+                    WebLoginSettingsView()
+                } label: {
+                    Label("Web console login", systemImage: "terminal")
+                }
             }
 
             Section {
