@@ -64,6 +64,16 @@ struct ProxmoxNodeStatus: Decodable {
             wait = rawWait
         }
     }
+
+    // Memberwise initializer so callers can create aggregated statuses.
+    init(cpu: Double, mem: Int64, maxmem: Int64, swap: Int64, maxswap: Int64, wait: Double) {
+        self.cpu = cpu
+        self.mem = mem
+        self.maxmem = maxmem
+        self.swap = swap
+        self.maxswap = maxswap
+        self.wait = wait
+    }
 }
 
 struct ProxmoxStorage: Decodable, Identifiable {
@@ -88,6 +98,72 @@ struct ProxmoxStorage: Decodable, Identifiable {
 
 private struct StorageListResponse: Decodable {
     let data: [ProxmoxStorage]
+}
+
+struct ProxmoxVM: Decodable, Identifiable {
+    var id: String { vmid }
+
+    let vmid: String
+    let name: String
+    let node: String
+    let status: String
+    let cpus: Int
+    let maxmem: Int64
+    let mem: Int64
+    let uptime: Int64?
+    let netin: Int64?
+    let netout: Int64?
+
+    // Flexible decoding: vmid may be Int or String; some fields vary by Proxmox version.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        // vmid may be Int or String
+        if let intVmid = try? container.decode(Int.self, forKey: .vmid) {
+            vmid = String(intVmid)
+        } else if let strVmid = try? container.decode(String.self, forKey: .vmid) {
+            vmid = strVmid
+        } else {
+            vmid = ""
+        }
+
+        name = (try? container.decode(String.self, forKey: .name)) ?? ""
+        node = (try? container.decode(String.self, forKey: .node)) ?? ""
+        status = (try? container.decode(String.self, forKey: .status)) ?? "unknown"
+
+        // cpus may be present as 'cpus' or 'maxcpu'
+        if let cp = try? container.decode(Int.self, forKey: .cpus) {
+            cpus = cp
+        } else if let cp = try? container.decode(Int.self, forKey: .maxcpu) {
+            cpus = cp
+        } else {
+            cpus = 0
+        }
+
+        maxmem = (try? container.decode(Int64.self, forKey: .maxmem)) ?? 0
+        mem = (try? container.decode(Int64.self, forKey: .mem)) ?? 0
+        uptime = try? container.decode(Int64.self, forKey: .uptime)
+        netin = try? container.decode(Int64.self, forKey: .netin)
+        netout = try? container.decode(Int64.self, forKey: .netout)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case vmid
+        case name
+        case node
+        case status
+        case cpus
+        case maxcpu
+        case maxmem
+        case mem
+        case uptime
+        case netin
+        case netout
+    }
+}
+
+private struct VMListResponse: Decodable {
+    let data: [ProxmoxVM]
 }
 
 private struct NodeStatusResponse: Decodable {
@@ -120,6 +196,69 @@ final class ProxmoxClient {
     func fetchOverallStatus() async throws -> ProxmoxNodeStatus {
         let node = try await getNodeName()
         return try await fetchStatus(for: node)
+    }
+
+    /// Fetch the names of all nodes in the cluster.
+    func fetchAllNodeNames() async throws -> [String] {
+        let url = try makeURL(path: "/api2/json/nodes")
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        if !tokenID.isEmpty && !tokenSecret.isEmpty {
+            let authHeader = "PVEAPIToken=\(tokenID)=\(tokenSecret)"
+            request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+        }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              200..<300 ~= httpResponse.statusCode else {
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let body = String(data: data, encoding: .utf8) ?? "<non-UTF8 response>"
+            print("❌ Proxmox /nodes request failed – status: \(status), body: \(body)")
+            throw ProxmoxClientError.requestFailed(statusCode: status, message: body)
+        }
+
+        do {
+            let decoded = try JSONDecoder().decode(NodesResponse.self, from: data)
+            return decoded.data.map { $0.node }
+        } catch {
+            print("❌ Failed to decode /nodes response: \(error)")
+            throw ProxmoxClientError.decodingFailed(underlying: error)
+        }
+    }
+
+    /// Fetch status for all nodes and aggregate the results.
+    func fetchAllStatus() async throws -> ProxmoxNodeStatus {
+        let nodeNames = try await fetchAllNodeNames()
+        if nodeNames.isEmpty {
+            throw ProxmoxClientError.noNodesFound
+        }
+        // Fetch each node status concurrently
+        let statusTasks = nodeNames.map { node in
+            Task { try await fetchStatus(for: node) }
+        }
+        var statuses: [ProxmoxNodeStatus] = []
+        for task in statusTasks {
+            do {
+                let status = try await task.value
+                statuses.append(status)
+            } catch {
+                // If one node fails, ignore and continue
+                print("❌ Failed to fetch status for node: \(error)")
+            }
+        }
+        guard !statuses.isEmpty else {
+            throw ProxmoxClientError.noNodesFound
+        }
+        // Aggregate metrics
+        let cpuAvg = statuses.map { $0.cpu }.reduce(0, +) / Double(statuses.count)
+        let memSum = statuses.map { $0.mem }.reduce(0, +)
+        let maxMemSum = statuses.map { $0.maxmem }.reduce(0, +)
+        let swapSum = statuses.map { $0.swap }.reduce(0, +)
+        let maxSwapSum = statuses.map { $0.maxswap }.reduce(0, +)
+        let waitAvg = statuses.map { $0.wait }.reduce(0, +) / Double(statuses.count)
+        return ProxmoxNodeStatus(cpu: cpuAvg, mem: memSum, maxmem: maxMemSum, swap: swapSum, maxswap: maxSwapSum, wait: waitAvg)
     }
 
     func fetchStoragesForNode() async throws -> [ProxmoxStorage] {
@@ -180,7 +319,7 @@ final class ProxmoxClient {
         }
     }
 
-    private func fetchStatus(for node: String) async throws -> ProxmoxNodeStatus {
+    func fetchStatus(for node: String) async throws -> ProxmoxNodeStatus {
         let encodedNode = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
         let url = try makeURL(path: "/api2/json/nodes/\(encodedNode)/status")
 
@@ -212,7 +351,7 @@ final class ProxmoxClient {
         }
     }
 
-    private func fetchStorages(for node: String) async throws -> [ProxmoxStorage] {
+    func fetchStorages(for node: String) async throws -> [ProxmoxStorage] {
         let encodedNode = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
         let url = try makeURL(path: "/api2/json/nodes/\(encodedNode)/storage")
 
@@ -240,6 +379,52 @@ final class ProxmoxClient {
             let body = String(data: data, encoding: .utf8) ?? "<non-UTF8 response>"
             print("❌ Failed to decode /storage response: \(error)")
             print("Raw /storage body: \(body)")
+            throw ProxmoxClientError.decodingFailed(underlying: error)
+        }
+    }
+
+    /// Fetch all VMs datacenter-wide (across all nodes).
+    func fetchAllVMs() async throws -> [ProxmoxVM] {
+        // Use the correct path: /cluster/resources (singular)
+        let url = try makeURL(path: "/api2/json/cluster/resources?type=vm")
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        let hasAuth = !tokenID.isEmpty && !tokenSecret.isEmpty
+        if hasAuth {
+            // Mask secret from logs but include token ID so developer can confirm which token is used.
+            let authHeader = "PVEAPIToken=\(tokenID)=\(tokenSecret)"
+            request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+        }
+
+        // Debug: print request info so developers can inspect in Xcode console.
+        print("➡️ Proxmox request: GET \(url.absoluteString)")
+        if hasAuth {
+            print("🔐 Authorization: token ID present (\(tokenID)); secret is hidden")
+        } else {
+            print("🔓 Authorization: no token configured")
+        }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        if let httpResponse = response as? HTTPURLResponse {
+            let bodyText = String(data: data, encoding: .utf8) ?? "<non-UTF8 response>"
+            print("⬅️ Proxmox response: status=\(httpResponse.statusCode), bodyPreview=\(bodyText.prefix(1024))")
+            guard 200..<300 ~= httpResponse.statusCode else {
+                throw ProxmoxClientError.requestFailed(statusCode: httpResponse.statusCode, message: bodyText)
+            }
+        } else {
+            let bodyText = String(data: data, encoding: .utf8) ?? "<non-UTF8 response>"
+            print("⬅️ Proxmox response: non-HTTP response, bodyPreview=\(bodyText.prefix(1024))")
+        }
+
+        do {
+            let decoded = try JSONDecoder().decode(VMListResponse.self, from: data)
+            return decoded.data
+        } catch {
+            let body = String(data: data, encoding: .utf8) ?? "<non-UTF8 response>"
+            print("❌ Failed to decode /cluster/resources response: \(error)")
+            print("Raw response body: \(body)")
             throw ProxmoxClientError.decodingFailed(underlying: error)
         }
     }

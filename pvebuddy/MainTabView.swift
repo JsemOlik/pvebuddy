@@ -26,6 +26,12 @@ struct MainTabView: View {
                 Text("Dashboard")
             }
 
+            VMsView()
+            .tabItem {
+                Image(systemName: "cube.transparent")
+                Text("VMs")
+            }
+
             NavigationStack {
                 SettingsView()
             }

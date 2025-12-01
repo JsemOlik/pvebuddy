@@ -1,80 +1,15 @@
 import SwiftUI
 import Combine
+import Charts
 
-@MainActor
-final class DashboardViewModel: ObservableObject {
-    @Published var status: ProxmoxNodeStatus?
-    @Published var storages: [ProxmoxStorage] = []
-    @Published var isLoading: Bool = false
-    @Published var errorMessage: String?
-
-    private let client: ProxmoxClient
-    private var autoRefreshTask: Task<Void, Never>?
-
-    init(serverAddress: String) {
-        self.client = ProxmoxClient(baseAddress: serverAddress)
-    }
-
-    deinit {
-        autoRefreshTask?.cancel()
-    }
-
-    func startAutoRefresh() {
-        autoRefreshTask?.cancel()
-        autoRefreshTask = Task {
-            while !Task.isCancelled {
-                await refresh()
-                try? await Task.sleep(for: .seconds(3))
-            }
-        }
-    }
-
-    func stopAutoRefresh() {
-        autoRefreshTask?.cancel()
-        autoRefreshTask = nil
-    }
-
-    func refresh() async {
-        guard !isLoading else { return }
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            async let statusResult = client.fetchOverallStatus()
-            async let storageResult = client.fetchStoragesForNode()
-
-            let (statusValue, storageValue) = try await (statusResult, storageResult)
-            status = statusValue
-            storages = storageValue
-        } catch let error as ProxmoxClientError {
-            switch error {
-            case .invalidURL:
-                errorMessage = "The server address looks invalid. Make sure it includes the scheme, e.g. https://pve.example.com:8006."
-            case .requestFailed(let statusCode, _):
-                if statusCode == 401 || statusCode == 403 {
-                    errorMessage = "Authentication failed. Please double-check your API token ID and secret, and that the token has permissions."
-                } else if statusCode == 0 || statusCode == -1 {
-                    errorMessage = "Unable to reach your Proxmox server. Check the address, network, and HTTPS certificate (self-signed certs may need extra setup)."
-                } else {
-                    errorMessage = "Server returned an error (HTTP \(statusCode)). See the Xcode console for details."
-                }
-            case .decodingFailed:
-                errorMessage = "Received data in an unexpected format. Make sure your Proxmox version is supported."
-            case .noNodesFound:
-                errorMessage = "No nodes were returned by the Proxmox API. Check that your token has permission to view the cluster."
-            }
-        } catch {
-            errorMessage = "Unexpected error: \(error.localizedDescription)"
-        }
-
-        isLoading = false
-    }
-}
+// DashboardViewModel moved to `DashboardViewModel.swift` to keep the view file smaller.
 
 struct DashboardView: View {
     @StateObject private var viewModel: DashboardViewModel
     @State private var showRebootConfirm: Bool = false
     @State private var showShutdownConfirm: Bool = false
+    @State private var showCPUDetail: Bool = false
+    @State private var showMemoryDetail: Bool = false
 
     init(serverAddress: String) {
         _viewModel = StateObject(wrappedValue: DashboardViewModel(serverAddress: serverAddress))
@@ -88,6 +23,34 @@ struct DashboardView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     header
+                    // Node selector (clear label + helper text)
+                    if !viewModel.nodeNames.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 12) {
+                                Text("Node")
+                                    .font(.subheadline.weight(.semibold))
+
+                                Spacer()
+
+                                Picker("", selection: $viewModel.selectedNode) {
+                                    Text("Datacenter").tag(String?.none)
+                                    ForEach(viewModel.nodeNames, id: \.self) { node in
+                                        Text(node).tag(String?.some(node))
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .labelsHidden()
+                            }
+
+                            Text("Select a node to view its metrics.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        .onChange(of: viewModel.selectedNode) { newValue in
+                            viewModel.isDatacenter = newValue == nil
+                            Task { await viewModel.refresh() }
+                        }
+                    }
 
                     if let status = viewModel.status {
                         statsGrid(for: status)
@@ -149,12 +112,23 @@ struct DashboardView: View {
         .navigationBarBackButtonHidden(true)
         .onAppear {
             viewModel.startAutoRefresh()
+            Task { await viewModel.refresh() }
         }
         .onDisappear {
             viewModel.stopAutoRefresh()
         }
         .refreshable {
             await viewModel.refresh()
+        }
+        .sheet(isPresented: $showCPUDetail) {
+            cpuDetailSheet
+                .presentationDetents([.fraction(0.35), .fraction(0.75)])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showMemoryDetail) {
+            memoryDetailSheet
+                .presentationDetents([.fraction(0.35), .fraction(0.75)])
+                .presentationDragIndicator(.visible)
         }
         .alert("Reboot node?", isPresented: $showRebootConfirm) {
             Button("Reboot", role: .destructive) {
@@ -207,19 +181,29 @@ struct DashboardView: View {
     private func statsGrid(for status: ProxmoxNodeStatus) -> some View {
         VStack(spacing: 16) {
             HStack(spacing: 16) {
-                usageCard(
-                    title: "CPU usage",
-                    value: cpuPercentage(from: status),
-                    accentColor: .blue,
-                    systemImage: "cpu"
-                )
+                Button {
+                    showCPUDetail = true
+                } label: {
+                    usageCard(
+                        title: "CPU usage",
+                        value: cpuPercentage(from: status),
+                        accentColor: .blue,
+                        systemImage: "cpu"
+                    )
+                }
+                .buttonStyle(.plain)
 
-                usageCard(
-                    title: "Memory usage",
-                    value: memoryPercentage(from: status),
-                    accentColor: .green,
-                    systemImage: "memorychip"
-                )
+                Button {
+                    showMemoryDetail = true
+                } label: {
+                    usageCard(
+                        title: "Memory usage",
+                        value: memoryPercentage(from: status),
+                        accentColor: .green,
+                        systemImage: "memorychip"
+                    )
+                }
+                .buttonStyle(.plain)
             }
 
             HStack(spacing: 16) {
@@ -238,6 +222,16 @@ struct DashboardView: View {
                 )
             }
         }
+    }
+
+    // MARK: - Detail Sheets
+
+    private var cpuDetailSheet: some View {
+        CPUDetailView(samples: viewModel.samples)
+    }
+
+    private var memoryDetailSheet: some View {
+        MemoryDetailView(samples: viewModel.samples)
     }
 
     private var storageSection: some View {
