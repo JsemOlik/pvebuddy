@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import Combine
+import os
 
 @MainActor
 final class VMsViewModel: ObservableObject {
@@ -14,7 +15,9 @@ final class VMsViewModel: ObservableObject {
     private var autoRefreshTask: Task<Void, Never>?
 
     init(serverAddress: String) {
+        NSLog("🏗️ VMsViewModel.init() called with address: %@", serverAddress)
         self.client = ProxmoxClient(baseAddress: serverAddress)
+        NSLog("✅ ProxmoxClient initialized")
     }
 
     deinit {
@@ -22,15 +25,20 @@ final class VMsViewModel: ObservableObject {
     }
 
     func startAutoRefresh() {
+        NSLog("🚀 startAutoRefresh() called")
         autoRefreshTask?.cancel()
         autoRefreshTask = Task {
+            NSLog("🔁 Auto-refresh task started")
             // Load node list once when auto-refresh starts so the UI picker can populate.
             await loadNodes()
+            NSLog("✅ Nodes loaded")
 
             while !Task.isCancelled {
+                NSLog("⏱️ Auto-refresh tick")
                 await refresh()
-                try? await Task.sleep(for: .seconds(5))
+                try? await Task.sleep(for: .seconds(3))
             }
+            NSLog("🛑 Auto-refresh task cancelled")
         }
     }
 
@@ -40,19 +48,29 @@ final class VMsViewModel: ObservableObject {
     }
 
     func refresh() async {
-        guard !isLoading else { return }
+        guard !isLoading else { 
+            NSLog("⏭️ Refresh skipped - already loading")
+            return 
+        }
         isLoading = true
         errorMessage = nil
+        
+        NSLog("🔄 VMsViewModel.refresh() started")
 
         do {
             let fetchedVMs = try await client.fetchAllVMs()
+            NSLog("✅ Fetched %d VMs", fetchedVMs.count)
+            
             // Filter by selected node if one is chosen
             if let node = selectedNode, !node.isEmpty {
                 self.vms = fetchedVMs.filter { $0.node == node }
+                NSLog("📍 Filtered to %d VMs on node '%@'", self.vms.count, node)
             } else {
                 self.vms = fetchedVMs
+                NSLog("🌐 Using all %d VMs (no node filter)", self.vms.count)
             }
         } catch let error as ProxmoxClientError {
+            NSLog("❌ ProxmoxClientError in refresh: %@", "\(error)")
             switch error {
             case .invalidURL:
                 errorMessage = "The server address looks invalid. Make sure it includes the scheme, e.g. https://pve.example.com:8006."
@@ -69,11 +87,14 @@ final class VMsViewModel: ObservableObject {
             case .noNodesFound:
                 errorMessage = "No VMs were returned by the Proxmox API. Check that your token has permission to view VMs."
             }
+            NSLog("💬 Error message set: %@", errorMessage ?? "nil")
         } catch {
+            NSLog("❌ Unexpected error in refresh: %@", "\(error)")
             errorMessage = "Unexpected error: \(error.localizedDescription)"
         }
 
         isLoading = false
+        NSLog("🔄 VMsViewModel.refresh() completed")
     }
 
     /// Load available node names for the cluster so the UI can present a picker.

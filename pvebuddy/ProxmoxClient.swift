@@ -1,4 +1,7 @@
 import Foundation
+import os.log
+
+let logger = Logger(subsystem: "dev.jsemolik.pvebuddy", category: "proxmox")
 
 struct ProxmoxNode: Decodable {
     let node: String
@@ -100,21 +103,13 @@ private struct StorageListResponse: Decodable {
     let data: [ProxmoxStorage]
 }
 
-struct ProxmoxVM: Decodable, Identifiable {
-    var id: String { vmid }
-
+struct ProxmoxVMListItem: Decodable {
     let vmid: String
     let name: String
     let node: String
     let status: String
-    let cpus: Int
-    let maxmem: Int64
-    let mem: Int64
-    let uptime: Int64?
-    let netin: Int64?
-    let netout: Int64?
+    let type: String
 
-    // Flexible decoding: vmid may be Int or String; some fields vary by Proxmox version.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
@@ -130,8 +125,29 @@ struct ProxmoxVM: Decodable, Identifiable {
         name = (try? container.decode(String.self, forKey: .name)) ?? ""
         node = (try? container.decode(String.self, forKey: .node)) ?? ""
         status = (try? container.decode(String.self, forKey: .status)) ?? "unknown"
+        type = (try? container.decode(String.self, forKey: .type)) ?? ""
+    }
 
-        // cpus may be present as 'cpus' or 'maxcpu'
+    private enum CodingKeys: String, CodingKey {
+        case vmid
+        case name
+        case node
+        case status
+        case type
+    }
+}
+
+struct ProxmoxVMDetail: Decodable {
+    let cpus: Int
+    let maxmem: Int64
+    let mem: Int64
+    let uptime: Int64?
+    let netin: Int64?
+    let netout: Int64?
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
         if let cp = try? container.decode(Int.self, forKey: .cpus) {
             cpus = cp
         } else if let cp = try? container.decode(Int.self, forKey: .maxcpu) {
@@ -148,10 +164,6 @@ struct ProxmoxVM: Decodable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case vmid
-        case name
-        case node
-        case status
         case cpus
         case maxcpu
         case maxmem
@@ -162,8 +174,27 @@ struct ProxmoxVM: Decodable, Identifiable {
     }
 }
 
+struct ProxmoxVM: Decodable, Identifiable {
+    var id: String { vmid }
+
+    let vmid: String
+    let name: String
+    let node: String
+    let status: String
+    let cpus: Int
+    let maxmem: Int64
+    let mem: Int64
+    let uptime: Int64?
+    let netin: Int64?
+    let netout: Int64?
+}
+
 private struct VMListResponse: Decodable {
-    let data: [ProxmoxVM]
+    let data: [ProxmoxVMListItem]
+}
+
+private struct VMDetailResponse: Decodable {
+    let data: ProxmoxVMDetail
 }
 
 private struct NodeStatusResponse: Decodable {
@@ -385,46 +416,132 @@ final class ProxmoxClient {
 
     /// Fetch all VMs datacenter-wide (across all nodes).
     func fetchAllVMs() async throws -> [ProxmoxVM] {
-        // Use the correct path: /cluster/resources (singular)
-        let url = try makeURL(path: "/api2/json/cluster/resources?type=vm")
+        print("📡 Starting fetchAllVMs...")
+        
+        // Step 1: Fetch VM list from cluster/resources
+        let listUrl = try makeURL(path: "/api2/json/cluster/resources?type=vm")
+        var listRequest = URLRequest(url: listUrl)
+        listRequest.httpMethod = "GET"
+        let hasAuth = !tokenID.isEmpty && !tokenSecret.isEmpty
+        if hasAuth {
+            let authHeader = "PVEAPIToken=\(tokenID)=\(tokenSecret)"
+            listRequest.setValue(authHeader, forHTTPHeaderField: "Authorization")
+        }
+
+        print("➡️ Proxmox request: GET \(listUrl.absoluteString)")
+        print("📋 Token ID configured: \(hasAuth)")
+        print("🔑 Token ID: '\(tokenID)'")
+        print("🔐 Token Secret length: \(tokenSecret.count) chars")
+
+        do {
+            let (listData, listResponse) = try await URLSession.shared.data(for: listRequest)
+
+            guard let httpResponse = listResponse as? HTTPURLResponse else {
+                print("⚠️ Response is not HTTPURLResponse")
+                throw ProxmoxClientError.requestFailed(statusCode: -1, message: "Invalid response type")
+            }
+
+            let bodyText = String(data: listData, encoding: .utf8) ?? "<non-UTF8 response>"
+            print("⬅️ Proxmox response: status=\(httpResponse.statusCode)")
+            print("📦 Response body (first 2000 chars): \(bodyText.prefix(2000))")
+
+            guard 200..<300 ~= httpResponse.statusCode else {
+                print("❌ HTTP error: \(httpResponse.statusCode)")
+                throw ProxmoxClientError.requestFailed(statusCode: httpResponse.statusCode, message: bodyText)
+            }
+
+            // Step 2: Decode the list
+            let listDecoded: VMListResponse
+            do {
+                listDecoded = try JSONDecoder().decode(VMListResponse.self, from: listData)
+                print("✅ Decoded \(listDecoded.data.count) VMs from cluster/resources")
+            } catch {
+                print("❌ Failed to decode /cluster/resources response: \(error)")
+                print("Raw response body: \(bodyText)")
+                throw ProxmoxClientError.decodingFailed(underlying: error)
+            }
+
+            guard !listDecoded.data.isEmpty else {
+                print("⚠️ No VMs returned from cluster/resources endpoint")
+                return []
+            }
+
+            // Step 3: Fetch detailed status for each VM concurrently
+            print("🔍 Fetching details for \(listDecoded.data.count) VMs...")
+            let detailTasks = listDecoded.data.map { item in
+                Task { () -> ProxmoxVM? in
+                    do {
+                        print("  ↳ Fetching details for VM \(item.vmid) (\(item.name)) on node \(item.node)")
+                        let detail = try await self.fetchVMDetail(node: item.node, vmid: item.vmid)
+                        let vm = ProxmoxVM(
+                            vmid: item.vmid,
+                            name: item.name,
+                            node: item.node,
+                            status: item.status,
+                            cpus: detail.cpus,
+                            maxmem: detail.maxmem,
+                            mem: detail.mem,
+                            uptime: detail.uptime,
+                            netin: detail.netin,
+                            netout: detail.netout
+                        )
+                        print("  ✅ Successfully fetched VM \(item.vmid)")
+                        return vm
+                    } catch {
+                        print("  ❌ Failed to fetch details for VM \(item.vmid): \(error)")
+                        // Return nil for failed VMs; they'll be filtered out below
+                        return nil
+                    }
+                }
+            }
+
+            var vms: [ProxmoxVM] = []
+            for task in detailTasks {
+                if let vm = await task.value {
+                    vms.append(vm)
+                }
+            }
+
+            print("🎉 Successfully fetched \(vms.count) VMs")
+            return vms
+        } catch {
+            print("💥 fetchAllVMs failed with error: \(error)")
+            throw error
+        }
+    }
+
+    func fetchVMDetail(node: String, vmid: String) async throws -> ProxmoxVMDetail {
+        let encodedNode = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
+        let encodedVmid = vmid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? vmid
+        let url = try makeURL(path: "/api2/json/nodes/\(encodedNode)/qemu/\(encodedVmid)/status/current")
+
+        print("    🔗 Detail URL: \(url.absoluteString)")
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        let hasAuth = !tokenID.isEmpty && !tokenSecret.isEmpty
-        if hasAuth {
-            // Mask secret from logs but include token ID so developer can confirm which token is used.
+        if !tokenID.isEmpty && !tokenSecret.isEmpty {
             let authHeader = "PVEAPIToken=\(tokenID)=\(tokenSecret)"
             request.setValue(authHeader, forHTTPHeaderField: "Authorization")
         }
 
-        // Debug: print request info so developers can inspect in Xcode console.
-        print("➡️ Proxmox request: GET \(url.absoluteString)")
-        if hasAuth {
-            print("🔐 Authorization: token ID present (\(tokenID)); secret is hidden")
-        } else {
-            print("🔓 Authorization: no token configured")
-        }
-
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        if let httpResponse = response as? HTTPURLResponse {
-            let bodyText = String(data: data, encoding: .utf8) ?? "<non-UTF8 response>"
-            print("⬅️ Proxmox response: status=\(httpResponse.statusCode), bodyPreview=\(bodyText.prefix(1024))")
-            guard 200..<300 ~= httpResponse.statusCode else {
-                throw ProxmoxClientError.requestFailed(statusCode: httpResponse.statusCode, message: bodyText)
-            }
-        } else {
-            let bodyText = String(data: data, encoding: .utf8) ?? "<non-UTF8 response>"
-            print("⬅️ Proxmox response: non-HTTP response, bodyPreview=\(bodyText.prefix(1024))")
+        guard let httpResponse = response as? HTTPURLResponse,
+              200..<300 ~= httpResponse.statusCode else {
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let body = String(data: data, encoding: .utf8) ?? "<non-UTF8 response>"
+            print("    ❌ Detail request failed with status \(status): \(body.prefix(500))")
+            throw ProxmoxClientError.requestFailed(statusCode: status, message: body)
         }
 
         do {
-            let decoded = try JSONDecoder().decode(VMListResponse.self, from: data)
+            let decoded = try JSONDecoder().decode(VMDetailResponse.self, from: data)
+            print("    ✅ Detail decoded successfully")
             return decoded.data
         } catch {
             let body = String(data: data, encoding: .utf8) ?? "<non-UTF8 response>"
-            print("❌ Failed to decode /cluster/resources response: \(error)")
-            print("Raw response body: \(body)")
+            print("    ❌ Failed to decode detail response: \(error)")
+            print("    Raw body: \(body.prefix(500))")
             throw ProxmoxClientError.decodingFailed(underlying: error)
         }
     }

@@ -7,7 +7,9 @@ struct VMsView: View {
     @State private var pickerSelection: String = "Datacenter"
 
     init() {
+        NSLog("📱 VMsView.init() called")
         let address = UserDefaults.standard.string(forKey: "pve_server_address") ?? ""
+        NSLog("📍 Server address from UserDefaults: %@", address)
         _viewModel = StateObject(wrappedValue: VMsViewModel(serverAddress: address))
     }
 
@@ -18,46 +20,53 @@ struct VMsView: View {
                     .ignoresSafeArea()
 
                 if let selected = selectedProxmoxVM {
-                    VMDetailView(vm: selected, onBack: { selectedProxmoxVM = nil })
+                    VMDetailView(vm: selected, serverAddress: storedServerAddress, onBack: { selectedProxmoxVM = nil })
                 } else if viewModel.isLoading && viewModel.vms.isEmpty {
-                    VStack(spacing: 12) {
-                        ProgressView()
-                        Text("Loading VMs…")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    ScrollView {
+                        VStack(spacing: 12) {
+                            ProgressView()
+                            Text("Loading VMs…")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxHeight: .infinity, alignment: .center)
                     }
                 } else if let message = viewModel.errorMessage {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("Unable to load VMs", systemImage: "exclamationmark.triangle.fill")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.orange)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("Unable to load VMs", systemImage: "exclamationmark.triangle.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.orange)
 
-                        Text(message)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            Text(message)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(Color(.systemBackground))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .strokeBorder(Color.orange.opacity(0.3), lineWidth: 0.5)
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(20)
                     }
-                    .padding(16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color(.systemBackground))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(Color.orange.opacity(0.3), lineWidth: 0.5)
-                    )
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(20)
                 } else if viewModel.vms.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("No VMs found")
-                            .font(.subheadline.weight(.semibold))
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("No VMs found")
+                                .font(.subheadline.weight(.semibold))
 
-                        Text("Pull down to refresh or check that you have permissions to view VMs.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            Text("Pull down to refresh or check that you have permissions to view VMs.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(20)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(20)
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
@@ -131,20 +140,23 @@ struct VMsView: View {
                             .accessibilityLabel("Bulk Actions")
                         }
                     }
-                    .navigationTitle("VMs")
-                    .navigationBarTitleDisplayMode(.large)
-                    .navigationBarBackButtonHidden(true)
-                    .onAppear {
-                        viewModel.startAutoRefresh()
-                        Task { await viewModel.refresh() }
-                    }
-                    .onDisappear {
-                        viewModel.stopAutoRefresh()
-                    }
-                    .refreshable {
-                        await viewModel.refresh()
-                    }
                 }
+            }
+            .navigationTitle("VMs")
+            .navigationBarTitleDisplayMode(.large)
+            .navigationBarBackButtonHidden(true)
+            .onAppear {
+                NSLog("📱 VMsView appeared - starting auto refresh")
+                viewModel.startAutoRefresh()
+                Task { await viewModel.refresh() }
+            }
+            .onDisappear {
+                NSLog("📱 VMsView disappeared - stopping auto refresh")
+                viewModel.stopAutoRefresh()
+            }
+            .refreshable {
+                NSLog("🔄 Manual refresh triggered")
+                await viewModel.refresh()
             }
         }
     }
@@ -264,12 +276,21 @@ struct VMsView: View {
 // MARK: - VM Detail View
 
 struct VMDetailView: View {
-    let vm: ProxmoxVM
+    let initialVM: ProxmoxVM
+    let serverAddress: String
     let onBack: () -> Void
     
+    @StateObject private var viewModel: VMDetailViewModel
     @State private var showShutdownConfirm: Bool = false
     @State private var showRebootConfirm: Bool = false
     @State private var showStartConfirm: Bool = false
+
+    init(vm: ProxmoxVM, serverAddress: String, onBack: @escaping () -> Void) {
+        self.initialVM = vm
+        self.serverAddress = serverAddress
+        self.onBack = onBack
+        _viewModel = StateObject(wrappedValue: VMDetailViewModel(vm: vm, serverAddress: serverAddress))
+    }
 
     var body: some View {
         ZStack {
@@ -307,7 +328,7 @@ struct VMDetailView: View {
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Are you sure you want to shut down \(vm.name)?")
+            Text("Are you sure you want to shut down \(viewModel.vm.name)?")
         }
         .alert("Reboot VM?", isPresented: $showRebootConfirm) {
             Button("Reboot", role: .destructive) {
@@ -315,7 +336,7 @@ struct VMDetailView: View {
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Are you sure you want to reboot \(vm.name)?")
+            Text("Are you sure you want to reboot \(viewModel.vm.name)?")
         }
         .alert("Start VM?", isPresented: $showStartConfirm) {
             Button("Start", role: .none) {
@@ -323,18 +344,27 @@ struct VMDetailView: View {
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Are you sure you want to start \(vm.name)?")
+            Text("Are you sure you want to start \(viewModel.vm.name)?")
+        }
+        .onAppear {
+            NSLog("📱 VMDetailView appeared for VM %@", initialVM.vmid)
+            viewModel.startAutoRefresh()
+            Task { await viewModel.refresh() }
+        }
+        .onDisappear {
+            NSLog("📱 VMDetailView disappeared for VM %@", initialVM.vmid)
+            viewModel.stopAutoRefresh()
         }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(vm.name)
+            Text(viewModel.vm.name)
                 .font(.title2.bold())
 
             HStack(spacing: 12) {
-                statusBadge(vm.status)
-                Text(vm.node)
+                statusBadge(viewModel.vm.status)
+                Text(viewModel.vm.node)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -342,14 +372,14 @@ struct VMDetailView: View {
     }
 
     private var usageMetricsGrid: some View {
-        let memUsedGB = Double(vm.mem) / 1024.0 / 1024.0 / 1024.0
-        let memMaxGB = Double(vm.maxmem) / 1024.0 / 1024.0 / 1024.0
+        let memUsedGB = Double(viewModel.vm.mem) / 1024.0 / 1024.0 / 1024.0
+        let memMaxGB = Double(viewModel.vm.maxmem) / 1024.0 / 1024.0 / 1024.0
         
         return VStack(spacing: 16) {
             HStack(spacing: 16) {
                 metricCard(
                     title: "CPU Usage",
-                    value: "0/\(vm.cpus) cores",
+                    value: "0/\(viewModel.vm.cpus) cores",
                     accentColor: .blue,
                     systemImage: "cpu"
                 )
