@@ -18,13 +18,13 @@ struct VmControlButtons: View {
     var body: some View {
         HStack(spacing: 12) {
             Menu {
-                Button(role: .destructive) { onShutdown() } label: {
+                Button { onShutdown() } label: {
                     HStack {
                         Image(systemName: "power").foregroundStyle(.blue)
                         Text("Shutdown").foregroundStyle(.primary)
                     }
                 }
-                Button(role: .destructive) { onForceStop() } label: {
+                Button { onForceStop() } label: {
                     HStack {
                         Image(systemName: "stop.fill").foregroundStyle(.blue)
                         Text("Force Stop").foregroundStyle(.primary)

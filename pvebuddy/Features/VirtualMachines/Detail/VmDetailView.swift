@@ -46,7 +46,8 @@ struct VmDetailView: View {
                     VmMetricsGrid(
                         cpuPercent: viewModel.cpuPercent,
                         memUsedBytes: viewModel.memUsed,
-                        memTotalBytes: viewModel.memMax
+                        memTotalBytes: viewModel.memMax,
+                        vmCPUs: viewModel.vm.cpus
                     )
 
                     VmUptimeCard(uptimeSeconds: viewModel.displayedUptime)

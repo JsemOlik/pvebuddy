@@ -11,6 +11,9 @@ struct VmMetricsGrid: View {
     let cpuPercent: Double
     let memUsedBytes: Int64
     let memTotalBytes: Int64
+    let vmCPUs: Int
+    @AppStorage("metric_cpu_absolute") private var showCpuAbsolute: Bool = false
+    @AppStorage("metric_mem_absolute") private var showMemAbsolute: Bool = true
 
     var body: some View {
         let memUsedGB = Double(memUsedBytes) / 1024.0 / 1024.0 / 1024.0
@@ -21,22 +24,49 @@ struct VmMetricsGrid: View {
 
         return VStack(spacing: 16) {
             HStack(spacing: 16) {
-                liveMetricCard(
-                    title: "CPU Usage",
-                    value: "\(Int(cpuPercent))%",
-                    progress: cpuPercent / 100.0,
-                    accentColor: .blue,
-                    systemImage: "cpu"
-                )
+                Button {
+                    showCpuAbsolute.toggle()
+                } label: {
+                    liveMetricCard(
+                        title: "CPU Usage",
+                        value: cpuValueText(percent: cpuPercent, cpus: vmCPUs, absolute: showCpuAbsolute),
+                        progress: cpuPercent / 100.0,
+                        accentColor: .blue,
+                        systemImage: "cpu"
+                    )
+                }
+                .buttonStyle(.plain)
 
-                liveMetricCard(
-                    title: "RAM Usage",
-                    value: String(format: "%.1f/%.0f GB", memUsedGB, memMaxGB),
-                    progress: memPct / 100.0,
-                    accentColor: .green,
-                    systemImage: "memorychip"
-                )
+                Button {
+                    showMemAbsolute.toggle()
+                } label: {
+                    liveMetricCard(
+                        title: "RAM Usage",
+                        value: memValueText(usedGB: memUsedGB, maxGB: memMaxGB, percent: memPct, absolute: showMemAbsolute),
+                        progress: memPct / 100.0,
+                        accentColor: .green,
+                        systemImage: "memorychip"
+                    )
+                }
+                .buttonStyle(.plain)
             }
+        }
+    }
+
+    private func cpuValueText(percent: Double, cpus: Int, absolute: Bool) -> String {
+        if absolute {
+            let used = Int(max(0, min(Double(cpus), round((percent / 100.0) * Double(cpus)))))
+            return "\(used)/\(cpus) vCPU"
+        } else {
+            return "\(Int(percent))%"
+        }
+    }
+
+    private func memValueText(usedGB: Double, maxGB: Double, percent: Double, absolute: Bool) -> String {
+        if absolute {
+            return String(format: "%.2f/%.2f GB", usedGB, maxGB)
+        } else {
+            return "\(Int(percent))%"
         }
     }
 

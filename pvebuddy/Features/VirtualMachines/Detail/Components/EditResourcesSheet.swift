@@ -28,7 +28,7 @@ struct EditResourcesSheet: View {
         NavigationStack {
             Form {
                 if let ns = viewModel.nodeStatus {
-                    Section(header: Text("Node capacity (live)")) {
+                    Section(header: Text("Node capacity")) {
                         let nodeUsedGB = Double(ns.mem) / 1024 / 1024 / 1024
                         let nodeMaxGB = Double(max(1, ns.maxmem)) / 1024 / 1024 / 1024
                         let nodePct = ns.maxmem > 0 ? Int((Double(ns.mem) / Double(ns.maxmem)) * 100.0) : 0
