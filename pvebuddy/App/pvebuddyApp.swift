@@ -9,9 +9,14 @@ import SwiftUI
 
 @main
 struct pvebuddyApp: App {
+    @AppStorage("has_onboarded") private var hasOnboarded: Bool = false
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            if hasOnboarded {
+                MainTabView()
+            } else {
+                OnboardingView()
+            }
         }
     }
 }

@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct ContentView: View {
+struct OnboardingView: View {
     @AppStorage("pve_server_address") private var storedServerAddress: String = ""
     @AppStorage("pve_token_id") private var storedTokenID: String = ""
     @AppStorage("pve_token_secret") private var storedTokenSecret: String = ""
@@ -68,9 +68,7 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Subviews
-
-private extension ContentView {
+private extension OnboardingView {
     var onboardingHeader: some View {
         VStack(spacing: 16) {
             Image("ProxmoxLogo")
@@ -228,5 +226,5 @@ private extension ContentView {
 }
 
 #Preview {
-    ContentView()
+    OnboardingView()
 }

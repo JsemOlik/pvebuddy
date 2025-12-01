@@ -36,7 +36,7 @@ final class VMsViewModel: ObservableObject {
             while !Task.isCancelled {
                 NSLog("⏱️ Auto-refresh tick")
                 await refresh()
-                try? await Task.sleep(for: .seconds(3))
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
             }
             NSLog("🛑 Auto-refresh task cancelled")
         }

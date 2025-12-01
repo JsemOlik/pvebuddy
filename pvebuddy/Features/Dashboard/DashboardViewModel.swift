@@ -39,7 +39,7 @@ final class DashboardViewModel: ObservableObject {
         autoRefreshTask = Task {
             while !Task.isCancelled {
                 await refresh()
-                try? await Task.sleep(for: .seconds(3))
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
             }
         }
     }

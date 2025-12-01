@@ -71,7 +71,7 @@ final class VMDetailViewModel: ObservableObject {
         if self.detailRefreshTick % 10 == 0 {
           await self.loadNodeStatus()
         }
-        try? await Task.sleep(for: .seconds(1))
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
       }
     }
   }

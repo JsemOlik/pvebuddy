@@ -32,7 +32,10 @@ struct DashboardView: View {
 
                                 Spacer()
 
-                                Picker("", selection: $viewModel.selectedNode) {
+                                Picker("", selection: Binding<String?>(
+                                    get: { viewModel.selectedNode },
+                                    set: { viewModel.selectedNode = $0 }
+                                )) {
                                     Text("Datacenter").tag(String?.none)
                                     ForEach(viewModel.nodeNames, id: \.self) { node in
                                         Text(node).tag(String?.some(node))

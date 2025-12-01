@@ -1,0 +1,171 @@
+pvebuddy
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:9:8 Invalid redeclaration of 'ProxmoxNodeStatus'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:41:8 Invalid redeclaration of 'ProxmoxStorage'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:49:16 Type 'StorageListResponse' does not conform to protocol 'Decodable'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:49:16 Type 'StorageListResponse' does not conform to protocol 'Decodable'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:49:60 'ProxmoxStorage' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:51:8 Invalid redeclaration of 'ProxmoxVMListItem'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:74:8 Invalid redeclaration of 'ProxmoxVMDetail'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:97:8 Invalid redeclaration of 'ProxmoxVM'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:112:16 Type 'VMListResponse' does not conform to protocol 'Decodable'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:112:16 Type 'VMListResponse' does not conform to protocol 'Decodable'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:112:55 'ProxmoxVMListItem' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:113:16 Type 'VMDetailResponse' does not conform to protocol 'Decodable'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:113:16 Type 'VMDetailResponse' does not conform to protocol 'Decodable'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:113:56 'ProxmoxVMDetail' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:114:16 Type 'NodeStatusResponse' does not conform to protocol 'Decodable'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:114:16 Type 'NodeStatusResponse' does not conform to protocol 'Decodable'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:114:58 'ProxmoxNodeStatus' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:174:41 'ProxmoxNodeStatus' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:178:20 'ProxmoxNodeStatus' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:179:34 No calls to throwing functions occur within 'try' expression
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:179:39 No 'async' operations occur within 'await' expression
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:190:54 'ProxmoxNodeStatus' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:195:17 No calls to throwing functions occur within 'try' expression
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:196:5 'catch' block is unreachable because no errors are thrown in 'do' block
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:199:57 'ProxmoxStorage' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:204:17 No calls to throwing functions occur within 'try' expression
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:205:5 'catch' block is unreachable because no errors are thrown in 'do' block
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:210:39 'ProxmoxVM' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:224:20 'ProxmoxVM' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:243:15 'ProxmoxVM' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:248:66 'ProxmoxVMDetail' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:254:17 No calls to throwing functions occur within 'try' expression
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxClient.swift:255:5 'catch' block is unreachable because no errors are thrown in 'do' block
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxModels.swift
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxModels.swift:10:8 Invalid redeclaration of 'ProxmoxNodeStatus'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxModels.swift:42:8 Invalid redeclaration of 'ProxmoxStorage'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxModels.swift:51:8 Invalid redeclaration of 'ProxmoxVMListItem'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxModels.swift:74:8 Invalid redeclaration of 'ProxmoxVMDetail'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Core/Network/ProxmoxModels.swift:97:8 Invalid redeclaration of 'ProxmoxVM'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/Dashboard/Components/StorageCard.swift
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/Dashboard/Components/StorageCard.swift:11:18 'ProxmoxStorage' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/Dashboard/Components/StorageCard.swift:16:69 Cannot convert value of type 'Duration' to expected argument type 'Int'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/Dashboard/DashboardView.swift
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/Dashboard/DashboardView.swift:56:37 Referencing subscript 'subscript(dynamicMember:)' requires wrapper 'ObservedObject<DashboardViewModel>.Wrapper'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/Dashboard/DashboardView.swift:180:40 'ProxmoxNodeStatus' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/Dashboard/DashboardView.swift:245:34 Referencing subscript 'subscript(dynamicMember:)' requires wrapper 'ObservedObject<DashboardViewModel>.Wrapper'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/Dashboard/DashboardView.swift:245:71 Referencing operator function '<' on 'Comparable' requires that 'Binding<Subject>' conform to 'Comparable'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/Dashboard/DashboardView.swift:255:41 'ProxmoxStorage' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/Dashboard/DashboardView.swift:258:69 Cannot convert value of type 'Duration' to expected argument type 'Int'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/Dashboard/DashboardView.swift:397:45 'ProxmoxNodeStatus' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/Dashboard/DashboardView.swift:401:48 'ProxmoxNodeStatus' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/Dashboard/DashboardView.swift:406:46 'ProxmoxNodeStatus' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/Dashboard/DashboardView.swift:411:49 'ProxmoxNodeStatus' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/Dashboard/DashboardViewModel.swift
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/Dashboard/DashboardViewModel.swift:7:28 'ProxmoxNodeStatus' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/Dashboard/DashboardViewModel.swift:8:31 'ProxmoxStorage' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailView.swift
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailView.swift:5:20 'ProxmoxVM' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailView.swift:24:14 'ProxmoxVM' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailView.swift:40:31 Referencing subscript 'subscript(dynamicMember:)' requires wrapper 'ObservedObject<VMDetailViewModel>.Wrapper'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailView.swift:40:44 Cannot convert value of type 'Binding<Subject>' to expected argument type 'String'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailView.swift:42:31 Referencing subscript 'subscript(dynamicMember:)' requires wrapper 'ObservedObject<VMDetailViewModel>.Wrapper'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailView.swift:42:44 Cannot convert value of type 'Binding<Subject>' to expected argument type 'String'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailView.swift:43:31 Referencing subscript 'subscript(dynamicMember:)' requires wrapper 'ObservedObject<VMDetailViewModel>.Wrapper'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailView.swift:43:44 Cannot convert value of type 'Binding<Subject>' to expected argument type 'String'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailView.swift:102:50 Referencing subscript 'subscript(dynamicMember:)' requires wrapper 'ObservedObject<VMDetailViewModel>.Wrapper'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailView.swift:106:36 Referencing subscript 'subscript(dynamicMember:)' requires wrapper 'ObservedObject<VMDetailViewModel>.Wrapper'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailView.swift:110:52 Referencing subscript 'subscript(dynamicMember:)' requires wrapper 'ObservedObject<VMDetailViewModel>.Wrapper'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailView.swift:114:52 Referencing subscript 'subscript(dynamicMember:)' requires wrapper 'ObservedObject<VMDetailViewModel>.Wrapper'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailView.swift:119:31 Referencing subscript 'subscript(dynamicMember:)' requires wrapper 'ObservedObject<VMDetailViewModel>.Wrapper'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailView.swift:161:20 Referencing subscript 'subscript(dynamicMember:)' requires wrapper 'ObservedObject<VMDetailViewModel>.Wrapper'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailView.swift:162:20 Referencing subscript 'subscript(dynamicMember:)' requires wrapper 'ObservedObject<VMDetailViewModel>.Wrapper'
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailViewModel.swift
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailViewModel.swift:7:22 'ProxmoxVM' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailViewModel.swift:28:30 'ProxmoxNodeStatus' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailViewModel.swift:38:26 'ProxmoxVM' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailViewModel.swift:42:12 'ProxmoxVM' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/VmDetailViewModel.swift:94:7 'catch' block is unreachable because no errors are thrown in 'do' block
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/List/Components/VmCard.swift
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/List/Components/VmCard.swift:11:13 'ProxmoxVM' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/List/VMsView.swift
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/List/VMsView.swift:6:41 'ProxmoxVM' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/List/VMsView.swift:20:11 Cannot find 'VMDetailView' in scope
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/List/VMsView.swift:171:29 'ProxmoxVM' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/List/VMsViewModel.swift
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/List/VMsViewModel.swift:8:26 'ProxmoxVM' is ambiguous for type lookup in this context
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/Components/EditResourcesSheet.swift
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/Components/EditResourcesSheet.swift:64:22 'onChange(of:perform:)' was deprecated in iOS 17.0: Use `onChange` with a two or zero parameter action closure instead.
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/Components/EditResourcesSheet.swift:84:34 'onChange(of:perform:)' was deprecated in iOS 17.0: Use `onChange` with a two or zero parameter action closure instead.
+
+/Users/olik/Developer/xcode/pvebuddy/pvebuddy/Features/VirtualMachines/Detail/Components/EditResourcesSheet.swift:94:34 'onChange(of:perform:)' was deprecated in iOS 17.0: Use `onChange` with a two or zero parameter action closure instead.

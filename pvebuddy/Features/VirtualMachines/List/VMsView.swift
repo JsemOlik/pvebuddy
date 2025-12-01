@@ -17,7 +17,7 @@ struct VMsView: View {
         Color(.systemGroupedBackground).ignoresSafeArea()
 
         if let selected = selectedProxmoxVM {
-          VMDetailView(
+          VmDetailView(
             vm: selected,
             serverAddress: storedServerAddress,
             onBack: { selectedProxmoxVM = nil }
