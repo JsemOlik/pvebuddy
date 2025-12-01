@@ -119,7 +119,7 @@ struct VMDetailView: View {
         Image(imageName)
           .resizable()
           .scaledToFill()
-          .frame(width: 36, height: 36)
+          .frame(width: 52, height: 52)
           .clipShape(Circle())
       }
       VStack(alignment: .leading, spacing: 6) {

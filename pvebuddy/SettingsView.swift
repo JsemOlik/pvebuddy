@@ -64,8 +64,6 @@ struct SettingsView: View {
                 } message: {
                     Text("This will remove your saved server address and API token. You cannot undo this.")
                 }
-            } footer: {
-                Text("Use with caution.")
             }
         }
         .navigationTitle("Settings")
