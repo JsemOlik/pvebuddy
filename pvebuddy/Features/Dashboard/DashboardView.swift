@@ -50,7 +50,7 @@ struct DashboardView: View {
                                 .foregroundStyle(.secondary)
                         }
                         // iOS 17+ preferred onChange overload:
-                        .onChange(of: viewModel.selectedNode) { newValue in
+                        .onChange(of: viewModel.selectedNode) { _, newValue in
                             viewModel.isDatacenter = newValue == nil
                             Task { await viewModel.refresh() }
                         }

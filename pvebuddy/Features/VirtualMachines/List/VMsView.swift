@@ -87,7 +87,7 @@ struct VMsView: View {
                 }
                 .pickerStyle(.menu)
                 // iOS 17+ preferred onChange overload
-                .onChange(of: pickerSelection) { new in
+                .onChange(of: pickerSelection) { _, new in
                   viewModel.selectedNode = (new == "Datacenter") ? nil : new
                   Task { await viewModel.refresh() }
                 }

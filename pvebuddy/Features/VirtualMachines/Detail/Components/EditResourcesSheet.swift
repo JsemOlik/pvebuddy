@@ -61,7 +61,7 @@ struct EditResourcesSheet: View {
                         in: minMemoryGB...maxMemoryGB,
                         step: memoryStep
                     )
-                    .onChange(of: memoryGB) { new in
+                    .onChange(of: memoryGB) { _, new in
                         if balloonGB > new { balloonGB = new }
                     }
 
@@ -81,7 +81,7 @@ struct EditResourcesSheet: View {
                             Text("Memory GB").font(.caption)
                             TextField("Custom GB", value: $memoryGB, format: .number)
                                 .keyboardType(.decimalPad)
-                                .onChange(of: memoryGB) { new in
+                                .onChange(of: memoryGB) { _, new in
                                     let clamped = min(max(new, minMemoryGB), maxMemoryGB)
                                     memoryGB = (clamped / memoryStep).rounded() * memoryStep
                                     if balloonGB > memoryGB { balloonGB = memoryGB }
@@ -91,7 +91,7 @@ struct EditResourcesSheet: View {
                             Text("Balloon GB").font(.caption)
                             TextField("Custom GB", value: $balloonGB, format: .number)
                                 .keyboardType(.decimalPad)
-                                .onChange(of: balloonGB) { new in
+                                .onChange(of: balloonGB) { _, new in
                                     let clamped = min(max(new, 0.0), memoryGB)
                                     balloonGB = (clamped / memoryStep).rounded() * memoryStep
                                 }
