@@ -9,22 +9,20 @@ final class DashboardViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
 
-    // Node selection state
     @Published var nodeNames: [String] = []
     @Published var selectedNode: String? = nil
     @Published var isDatacenter: Bool = false
 
-    // Time series samples (circular buffer)
     struct Sample: Identifiable {
         let id = UUID()
         let date: Date
-        let cpuPercent: Double // 0-100
+        let cpuPercent: Double
         let memUsed: Int64
         let memTotal: Int64
     }
 
     @Published var samples: [Sample] = []
-    private let maxSamples = 300 // keep ~15 minutes at 3s interval
+    private let maxSamples = 300
 
     private let client: ProxmoxClient
     private var autoRefreshTask: Task<Void, Never>?
@@ -34,9 +32,7 @@ final class DashboardViewModel: ObservableObject {
         Task { await fetchNodeNames() }
     }
 
-    deinit {
-        autoRefreshTask?.cancel()
-    }
+    deinit { autoRefreshTask?.cancel() }
 
     func startAutoRefresh() {
         autoRefreshTask?.cancel()
@@ -58,7 +54,6 @@ final class DashboardViewModel: ObservableObject {
             let names = try await client.fetchAllNodeNames()
             DispatchQueue.main.async {
                 self.nodeNames = names
-                // Default to first node if none selected
                 if self.selectedNode == nil && !names.isEmpty {
                     self.selectedNode = names.first
                 }
@@ -87,9 +82,14 @@ final class DashboardViewModel: ObservableObject {
             } else {
                 throw ProxmoxClientError.noNodesFound
             }
-            // Append a time series sample if we have status
+
             if let s = status {
-                let sample = Sample(date: Date(), cpuPercent: max(0, min(100, s.cpu * 100.0)), memUsed: s.mem, memTotal: s.maxmem)
+                let sample = Sample(
+                    date: Date(),
+                    cpuPercent: max(0, min(100, s.cpu * 100.0)),
+                    memUsed: s.mem,
+                    memTotal: s.maxmem
+                )
                 samples.append(sample)
                 if samples.count > maxSamples {
                     samples.removeFirst(samples.count - maxSamples)
