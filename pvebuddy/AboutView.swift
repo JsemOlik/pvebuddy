@@ -40,7 +40,7 @@ struct AboutView: View {
                     .cornerRadius(12)
                 }
 
-                Link(destination: URL(string: "https://github.com/")!) {
+                Link(destination: URL(string: "https://github.com/JsemOlik/pvebuddy")!) {
                     HStack {
                         Image(systemName: "chevron.left.forwardslash.chevron.right")
                         Text("Source code")
@@ -71,6 +71,10 @@ struct AboutView: View {
             Spacer()
 
             Text("© 2025 PVE Buddy")
+                .font(.footnote)
+                .foregroundColor(.secondary)
+                .padding(.bottom, -12)
+            Text("Made with ❤️ by Oliver Steiner")
                 .font(.footnote)
                 .foregroundColor(.secondary)
                 .padding(.bottom, 8)

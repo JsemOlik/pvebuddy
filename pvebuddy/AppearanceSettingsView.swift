@@ -6,10 +6,12 @@ struct AppearanceSettingsView: View {
     var body: some View {
         Form {
             Section(footer: Text("Choose how PVE Buddy looks. System follows the device setting.")) {
-                Picker("Appearance", selection: $appearancePreference) {
+                Picker(selection: $appearancePreference) {
                     Text("System").tag(0)
                     Text("Light").tag(1)
                     Text("Dark").tag(2)
+                } label: {
+                    EmptyView()
                 }
                 .pickerStyle(.inline)
             }
