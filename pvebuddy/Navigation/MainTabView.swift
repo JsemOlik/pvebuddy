@@ -35,10 +35,15 @@ struct MainTabView: View {
 
             VMsView()
             .tabItem {
-                Image(systemName: "cube.transparent")
+                Image(systemName: "display")
                 Text("VMs")
             }
-
+            
+            .tabItem {
+                Image(systemName: "cube.transparent")
+                Text("LXCs")
+            }
+            
             NavigationStack {
                 SettingsView()
             }
