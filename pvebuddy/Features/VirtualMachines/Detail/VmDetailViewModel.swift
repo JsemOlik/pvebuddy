@@ -342,6 +342,18 @@ final class VMDetailViewModel: ObservableObject {
       }
       
       self.vmDisks = disks
+    } catch let error as ProxmoxClientError {
+      self.vmDisks = []
+      // Suppress "ds" parameter errors - these are common and don't affect disk listing
+      if case .requestFailed(let code, let message) = error {
+        if code == 400 && message.contains("ds") {
+          self.storagesError = nil // Don't show error for missing ds parameter
+        } else {
+          self.storagesError = "Failed to load disks: \(message)"
+        }
+      } else {
+        self.storagesError = "Failed to load disks: \(error.localizedDescription)"
+      }
     } catch {
       self.vmDisks = []
       self.storagesError = "Failed to load disks: \(error.localizedDescription)"

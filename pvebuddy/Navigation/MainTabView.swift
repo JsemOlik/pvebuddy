@@ -6,10 +6,12 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct MainTabView: View {
     @AppStorage("pve_server_address") private var storedServerAddress: String = ""
     @AppStorage("appearance_preference") private var appearancePreference: Int = 0 // 0: System, 1: Light, 2: Dark
+    @AppStorage("notifications_enabled") private var notificationsEnabled: Bool = false
 
     private var preferredScheme: ColorScheme? {
         switch appearancePreference {
@@ -55,6 +57,65 @@ struct MainTabView: View {
         }
         .tint(.blue)
         .preferredColorScheme(preferredScheme)
+        .task {
+            await startMonitoringIfNeeded()
+        }
+        .onChange(of: notificationsEnabled) { _, newValue in
+            if newValue && !storedServerAddress.isEmpty {
+                Task {
+                    await startMonitoringIfNeeded()
+                }
+            } else {
+                VMMonitorService.shared.stopMonitoring()
+            }
+        }
+        .onChange(of: storedServerAddress) { _, newValue in
+            if notificationsEnabled && !newValue.isEmpty {
+                Task {
+                    await startMonitoringIfNeeded()
+                }
+            } else if newValue.isEmpty {
+                VMMonitorService.shared.stopMonitoring()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            // Restart monitoring when app comes to foreground
+            Task {
+                await startMonitoringIfNeeded()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+            // Schedule background task when app goes to background
+            BackgroundTaskManager.shared.scheduleBackgroundTask()
+        }
+    }
+    
+    private func startMonitoringIfNeeded() async {
+        print("🔍 Checking if monitoring should start...")
+        print("  - Notifications enabled: \(notificationsEnabled)")
+        print("  - Server address: \(storedServerAddress.isEmpty ? "empty" : "set")")
+        
+        guard notificationsEnabled && !storedServerAddress.isEmpty else {
+            if !notificationsEnabled {
+                print("  ⚠️ Notifications not enabled, skipping monitoring")
+            }
+            if storedServerAddress.isEmpty {
+                print("  ⚠️ Server address empty, skipping monitoring")
+            }
+            return
+        }
+        
+        // Check if we have notification permissions
+        let notificationManager = NotificationManager.shared
+        let authStatus = await notificationManager.checkAuthorizationStatus()
+        print("  - Notification auth status: \(authStatus.rawValue)")
+        
+        if authStatus == .authorized {
+            print("  ✅ Starting monitoring...")
+            VMMonitorService.shared.startMonitoring(serverAddress: storedServerAddress)
+        } else {
+            print("  ⚠️ Notifications not authorized, cannot start monitoring")
+        }
     }
 }
 
