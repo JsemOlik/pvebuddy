@@ -460,3 +460,100 @@ struct JSONAny: Decodable {
     value = ""
   }
 }
+
+// MARK: - LXC Power Actions
+
+func startLXC(node: String, vmid: String) async throws {
+    let upid = try await postLXCStatusAction(node: node, vmid: vmid, action: "start")
+    try await waitForTask(node: node, upid: upid)
+}
+
+func shutdownLXC(node: String, vmid: String, force: Bool = false, timeout: Int? = nil) async throws {
+    var params: [String: String] = [:]
+    if let timeout { params["timeout"] = String(timeout) }
+    let upid = try await postLXCStatusAction(node: node, vmid: vmid, action: "shutdown", form: params)
+    do {
+        try await waitForTask(node: node, upid: upid)
+    } catch {
+        if force { try await stopLXC(node: node, vmid: vmid) }
+        else { throw error }
+    }
+}
+
+func rebootLXC(node: String, vmid: String) async throws {
+    let upid = try await postLXCStatusAction(node: node, vmid: vmid, action: "reboot")
+    try await waitForTask(node: node, upid: upid)
+}
+
+func stopLXC(node: String, vmid: String) async throws {
+    let upid = try await postLXCStatusAction(node: node, vmid: vmid, action: "stop")
+    try await waitForTask(node: node, upid: upid)
+}
+
+// MARK: - LXC Config
+
+func fetchLXCConfig(node: String, vmid: String) async throws -> [String: String] {
+    let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
+    let vmidEnc = vmid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? vmid
+    let url = try makeURL(path: "/api2/json/nodes/\(nodeEnc)/lxc/\(vmidEnc)/config")
+    let (data, resp) = try await dataGET(url)
+    try ensureOK(resp, data)
+    do {
+        let decoded = try JSONDecoder().decode(ProxmoxVMConfigResponse.self, from: data)
+        var out: [String: String] = [:]
+        for (k, v) in decoded.data { out[k] = v.displayString }
+        return out
+    } catch { throw ProxmoxClientError.decodingFailed(underlying: error) }
+}
+
+// MARK: - LXC Config Update (Resources)
+
+func updateLXCResources(
+    node: String,
+    vmid: String,
+    cores: Int?,
+    memoryMiB: Int?,
+    swapMiB: Int?
+) async throws {
+    let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
+    let vmidEnc = vmid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? vmid
+    let url = try makeURL(path: "/api2/json/nodes/\(nodeEnc)/lxc/\(vmidEnc)/config")
+
+    var form: [String: String] = [:]
+    if let cores { form["cores"] = String(cores) }
+    if let memoryMiB { form["memory"] = String(memoryMiB) }
+    if let swapMiB { form["swap"] = String(swapMiB) }
+
+    let (data, resp) = try await dataPOSTForm(url, form: form)
+    try ensureOK(resp, data)
+}
+
+// MARK: - LXC Current Status
+
+func fetchLXCCurrentStatus(node: String, vmid: String) async throws -> VMCurrentStatus {
+    let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
+    let vmidEnc = vmid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? vmid
+    let url = try makeURL(path: "/api2/json/nodes/\(nodeEnc)/lxc/\(vmidEnc)/status/current")
+    let (data, resp) = try await dataGET(url)
+    try ensureOK(resp, data)
+    struct Raw: Decodable { let data: [String: JSONAny] }
+    let raw = try JSONDecoder().decode(Raw.self, from: data)
+    let d = raw.data
+    let status = d["status"]?.string ?? "unknown"
+    let cpuFraction = d["cpu"]?.double ?? 0.0
+    let memUsed = Int64(d["mem"]?.double ?? 0.0)
+    let memMax = Int64(d["maxmem"]?.double ?? 0.0)
+    return VMCurrentStatus(status: status, cpuFraction: cpuFraction, memUsed: memUsed, memMax: memMax)
+}
+
+// MARK: - LXC Helper
+
+private func postLXCStatusAction(node: String, vmid: String, action: String, form: [String: String] = [:]) async throws -> String {
+    let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
+    let vmidEnc = vmid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? vmid
+    let url = try makeURL(path: "/api2/json/nodes/\(nodeEnc)/lxc/\(vmidEnc)/status/\(action)")
+    let (data, resp) = try await dataPOSTForm(url, form: form)
+    try ensureOK(resp, data)
+    do { return try JSONDecoder().decode(ProxmoxTaskUPIDResponse.self, from: data).data }
+    catch { throw ProxmoxClientError.decodingFailed(underlying: error) }
+}

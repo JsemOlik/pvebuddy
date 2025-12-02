@@ -1,13 +1,13 @@
 //
-//  VmMetricsGrid.swift
+//  LxcMetricsGrid.swift
 //  pvebuddy
 //
-//  Created by Oliver Steiner on 01.12.2025.
+//  Created by Oliver Steiner on 02.12.2025.
 //
 
 import SwiftUI
 
-struct VmMetricsGrid: View {
+struct LxcMetricsGrid: View {
     let cpuPercent: Double
     let memUsedBytes: Int64
     let memTotalBytes: Int64
