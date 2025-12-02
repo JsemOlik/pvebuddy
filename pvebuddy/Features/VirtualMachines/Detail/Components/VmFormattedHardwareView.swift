@@ -72,7 +72,7 @@ struct VmFormattedHardwareView: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color(.systemBackground))
+                .fill(Color.cardBackground)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -125,14 +125,14 @@ private struct HardwareCategoryView: View {
                     .padding(.vertical, 4)
                     .background(
                         Capsule()
-                            .fill(Color(.secondarySystemBackground))
+                            .fill(Color.secondaryCardBackground)
                     )
             }
         }
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
+                .fill(Color.secondaryCardBackground)
         )
     }
 

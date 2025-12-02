@@ -44,7 +44,7 @@ struct ContainerStorageSection: View {
                 .padding(16)
                 .background(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color(.systemBackground))
+                        .fill(Color.cardBackground)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -72,7 +72,7 @@ struct ContainerStorageSection: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color(.systemBackground))
+                .fill(Color.cardBackground)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -133,7 +133,7 @@ private struct ContainerDiskItemView: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
+                .fill(Color.secondaryCardBackground)
         )
     }
 }

@@ -47,8 +47,8 @@ struct StorageCard: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(.systemBackground),
-                            Color(.secondarySystemBackground)
+                            Color.cardBackground,
+                            Color.secondaryCardBackground
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing

@@ -45,7 +45,7 @@ struct VmHardwareSection: View {
                             .padding(12)
                             .background(
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(Color(.systemBackground))
+                                    .fill(Color.cardBackground)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -71,7 +71,7 @@ struct VmHardwareSection: View {
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color(.systemBackground))
+                    .fill(Color.cardBackground)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
