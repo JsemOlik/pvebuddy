@@ -5,6 +5,16 @@ All notable changes to PVE Buddy will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0](https://github.com/JsemOlik/pvebuddy/compare/v1.1.0...v1.2.0) (2025-12-02)
+
+
+### ✨ Features
+
+* **lxc:** displays tags next to name ([3d51b3a](https://github.com/JsemOlik/pvebuddy/commit/3d51b3a0a5334aa740340f399d52e38527e1cb70))
+* **lxc:** More resource options, formatted hardware list with persistent view mode ([12becab](https://github.com/JsemOlik/pvebuddy/commit/12becab5949187c16fe993b96ec3526f24642b02))
+* **vm:** displays tags next to name ([2c44432](https://github.com/JsemOlik/pvebuddy/commit/2c444325aef608767b0b36e7536769e87e916792))
+* **vm:** More resource options, formatted hardware list with persistent view mode ([91576c5](https://github.com/JsemOlik/pvebuddy/commit/91576c592700b7546a266ad49d34145d3335fd2f))
+
 ## [1.1.0](https://github.com/JsemOlik/pvebuddy/compare/v1.0.1...v1.1.0) (2025-12-02)
 
 
