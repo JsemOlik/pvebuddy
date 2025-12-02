@@ -51,12 +51,30 @@ final class ProxmoxClient {
   private let baseAddress: String
   private let tokenID: String
   private let tokenSecret: String
+  private let urlSession: URLSession
 
   init(baseAddress: String) {
     self.baseAddress = baseAddress.trimmingCharacters(in: .whitespacesAndNewlines)
     let defaults = UserDefaults.standard
     self.tokenID = defaults.string(forKey: "pve_token_id") ?? ""
     self.tokenSecret = defaults.string(forKey: "pve_token_secret") ?? ""
+    
+    // Create a custom URLSession configuration for better control
+    let config = URLSessionConfiguration.default
+    config.httpShouldSetCookies = false
+    config.httpCookieAcceptPolicy = .never
+    config.httpAdditionalHeaders = [:]
+    // Ensure headers are not modified by the system
+    config.httpMaximumConnectionsPerHost = 10
+    config.timeoutIntervalForRequest = 30
+    config.timeoutIntervalForResource = 60
+    self.urlSession = URLSession(configuration: config)
+    
+    // Debug logging for authentication
+    if self.tokenID.isEmpty || self.tokenSecret.isEmpty {
+      logger.warning("⚠️ ProxmoxClient initialized with empty token - ID: \(self.tokenID.isEmpty ? "empty" : "set"), Secret: \(self.tokenSecret.isEmpty ? "empty" : "set")")
+      NSLog("⚠️ ProxmoxClient: Token ID is \(self.tokenID.isEmpty ? "EMPTY" : "set"), Token Secret is \(self.tokenSecret.isEmpty ? "EMPTY" : "set")")
+    }
   }
 
   // MARK: - Cluster & Node
@@ -504,7 +522,7 @@ final class ProxmoxClient {
       .joined(separator: "&")
     req.httpBody = body.data(using: .utf8)
 
-    let (data, resp) = try await URLSession.shared.data(for: req)
+    let (data, resp) = try await urlSession.data(for: req)
     try ensureOK(resp, data)
     let decoded = try JSONDecoder().decode(LoginTicketResponse.self, from: data)
     return (decoded.data.ticket, decoded.data.CSRFPreventionToken)
@@ -521,9 +539,36 @@ final class ProxmoxClient {
   }
 
   private func applyAuth(_ req: inout URLRequest) {
-    if !tokenID.isEmpty && !tokenSecret.isEmpty {
-      let authHeader = "PVEAPIToken=\(tokenID)=\(tokenSecret)"
+    // Re-read tokens from UserDefaults on each request to ensure we have the latest values
+    // This is important because tokens might be updated after client initialization
+    let defaults = UserDefaults.standard
+    var currentTokenID = defaults.string(forKey: "pve_token_id") ?? ""
+    var currentTokenSecret = defaults.string(forKey: "pve_token_secret") ?? ""
+    
+    // Trim whitespace from tokens (common issue when copying/pasting)
+    currentTokenID = currentTokenID.trimmingCharacters(in: .whitespacesAndNewlines)
+    currentTokenSecret = currentTokenSecret.trimmingCharacters(in: .whitespacesAndNewlines)
+    
+    if !currentTokenID.isEmpty && !currentTokenSecret.isEmpty {
+      // Proxmox API format: PVEAPIToken=USER@REALM!TOKENID=UUID
+      // The tokenID should already include user@realm!tokenid format
+      // IMPORTANT: Do not URL-encode the header value - it must be sent as-is
+      let authHeader = "PVEAPIToken=\(currentTokenID)=\(currentTokenSecret)"
       req.setValue(authHeader, forHTTPHeaderField: "Authorization")
+      
+      // Verify the header was set correctly (for debugging)
+      #if DEBUG
+      if let setHeader = req.value(forHTTPHeaderField: "Authorization") {
+        logger.debug("Auth header set: \(setHeader.prefix(50))...")
+      } else {
+        logger.warning("⚠️ Authorization header was not set!")
+        NSLog("⚠️ Authorization header verification failed for \(req.url?.absoluteString ?? "unknown")")
+      }
+      #endif
+    } else {
+      // If tokens are empty, log a warning
+      logger.warning("⚠️ Attempting API request without authentication tokens")
+      NSLog("⚠️ ProxmoxClient: No authentication tokens available for request to \(req.url?.absoluteString ?? "unknown")")
     }
   }
 
@@ -531,7 +576,21 @@ final class ProxmoxClient {
     var req = URLRequest(url: url)
     req.httpMethod = "GET"
     applyAuth(&req)
-    return try await URLSession.shared.data(for: req)
+    
+    do {
+      return try await urlSession.data(for: req)
+    } catch {
+      // Enhanced error logging for network issues
+      if let urlError = error as? URLError {
+        NSLog("❌ Network error on GET \(url.absoluteString):")
+        NSLog("   Code: \(urlError.code.rawValue)")
+        NSLog("   Description: \(urlError.localizedDescription)")
+        if let underlyingError = (error as NSError).userInfo[NSUnderlyingErrorKey] as? NSError {
+          NSLog("   Underlying: \(underlyingError.localizedDescription)")
+        }
+      }
+      throw error
+    }
   }
 
   private func dataPOSTForm(
@@ -553,7 +612,21 @@ final class ProxmoxClient {
         .joined(separator: "&")
       req.httpBody = body.data(using: .utf8)
     }
-    return try await URLSession.shared.data(for: req)
+    
+    do {
+      return try await urlSession.data(for: req)
+    } catch {
+      // Enhanced error logging for network issues
+      if let urlError = error as? URLError {
+        NSLog("❌ Network error on POST \(url.absoluteString):")
+        NSLog("   Code: \(urlError.code.rawValue)")
+        NSLog("   Description: \(urlError.localizedDescription)")
+        if let underlyingError = (error as NSError).userInfo[NSUnderlyingErrorKey] as? NSError {
+          NSLog("   Underlying: \(underlyingError.localizedDescription)")
+        }
+      }
+      throw error
+    }
   }
 
   private func dataPUTForm(
@@ -575,7 +648,21 @@ final class ProxmoxClient {
         .joined(separator: "&")
       req.httpBody = body.data(using: .utf8)
     }
-    return try await URLSession.shared.data(for: req)
+    
+    do {
+      return try await urlSession.data(for: req)
+    } catch {
+      // Enhanced error logging for network issues
+      if let urlError = error as? URLError {
+        NSLog("❌ Network error on PUT \(url.absoluteString):")
+        NSLog("   Code: \(urlError.code.rawValue)")
+        NSLog("   Description: \(urlError.localizedDescription)")
+        if let underlyingError = (error as NSError).userInfo[NSUnderlyingErrorKey] as? NSError {
+          NSLog("   Underlying: \(underlyingError.localizedDescription)")
+        }
+      }
+      throw error
+    }
   }
 
   private func ensureOK(_ response: URLResponse, _ data: Data) throws {
@@ -597,7 +684,52 @@ final class ProxmoxClient {
         body.contains("does not exist\n")
       )
       
-      if !isExpectedError {
+      // For 401 errors, always log with additional context
+      if http.statusCode == 401 {
+        let defaults = UserDefaults.standard
+        var tokenID = defaults.string(forKey: "pve_token_id") ?? ""
+        var tokenSecret = defaults.string(forKey: "pve_token_secret") ?? ""
+        tokenID = tokenID.trimmingCharacters(in: .whitespacesAndNewlines)
+        tokenSecret = tokenSecret.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Show the actual auth header format (without exposing full secret)
+        let authHeaderPreview = "PVEAPIToken=\(tokenID)=\(tokenSecret.isEmpty ? "EMPTY" : "***")"
+        
+        logger.error("HTTP 401 Authentication failed. Token ID: \(tokenID.isEmpty ? "EMPTY" : "present"), Token Secret: \(tokenSecret.isEmpty ? "EMPTY" : "present")")
+        NSLog("❌ Proxmox API authentication failed (HTTP 401)")
+        NSLog("   Token ID: \(tokenID.isEmpty ? "EMPTY" : tokenID)")
+        NSLog("   Token Secret: \(tokenSecret.isEmpty ? "EMPTY" : "present (\(tokenSecret.count) chars)")")
+        NSLog("   Auth Header Format: \(authHeaderPreview)")
+        if let httpResponse = response as? HTTPURLResponse {
+          if let url = httpResponse.url {
+            NSLog("   URL: \(url.absoluteString)")
+          }
+          // Log all response headers for debugging
+          NSLog("   Response Headers: \(httpResponse.allHeaderFields)")
+        }
+        NSLog("   Response Body: %@", body.isEmpty ? "(empty - this might indicate a network/proxy issue)" : body)
+        
+        // Check if token format looks correct
+        if !tokenID.isEmpty {
+          let hasAtSymbol = tokenID.contains("@")
+          let hasExclamation = tokenID.contains("!")
+          if !hasAtSymbol || !hasExclamation {
+            NSLog("   ⚠️ Token ID format might be incorrect - should be: user@realm!tokenname")
+            NSLog("   Current format: \(hasAtSymbol ? "has @" : "missing @"), \(hasExclamation ? "has !" : "missing !")")
+          }
+        }
+        
+        // Additional device-specific debugging
+        #if targetEnvironment(simulator)
+        NSLog("   Environment: Simulator")
+        #else
+        NSLog("   Environment: Physical Device")
+        NSLog("   ⚠️ This is a physical device - check for:")
+        NSLog("      - VPN/Proxy settings that might modify headers")
+        NSLog("      - Certificate trust issues (Settings > General > About > Certificate Trust Settings)")
+        NSLog("      - Network restrictions or firewall rules")
+        #endif
+      } else if !isExpectedError {
         // Only log unexpected errors
         logger.error("HTTP \(http.statusCode) error: \(body)")
         NSLog("❌ Proxmox API error (HTTP \(http.statusCode)): %@", body)
