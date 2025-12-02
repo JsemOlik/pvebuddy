@@ -40,13 +40,14 @@ Please keep UI in SwiftUI and business logic in view models or client.
 ## Conventional Commits
 
 Use Conventional Commits for PR titles and commit messages:
-- `feat:` new user‑visible feature
-- `fix:` bug fix
-- `docs:` README or comments only
-- `refactor:` no behavior change
-- `perf:` performance improvement
-- `test:` tests only
-- `chore:` build/infra/ci
+- `feat`: A new feature (triggers MINOR version bump)
+- `fix`: A bug fix (triggers PATCH version bump)
+- `docs`: Documentation only changes (no version bump)
+- `style`: Changes that do not affect the meaning of the code (no version bump)
+- `refactor`: A code change that neither fixes a bug nor adds a feature (no version bump)
+- `perf`: A performance improvement (triggers PATCH version bump)
+- `test`: Adding missing tests or correcting existing tests (no version bump)
+- `chore`: Changes to the build process or auxiliary tools (no version bump)
 
 Breaking changes: `feat!:` or include `BREAKING CHANGE:` in the body.
 
