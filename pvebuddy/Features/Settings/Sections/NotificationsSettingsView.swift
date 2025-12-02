@@ -60,7 +60,10 @@ struct NotificationsSettingsView: View {
                 }
 
                 Toggle(isOn: $notifyStatusChanges) {
-                    Label("Cluster status changes", systemImage: "bolt.trianglebadge.exclamationmark")
+                    Label("VM Power Changes", systemImage: "bolt.trianglebadge.exclamationmark")
+                }
+                Toggle(isOn: $notifyStatusChanges) {
+                    Label("LXC Power Changes", systemImage: "bolt.trianglebadge.exclamationmark")
                 }
                 .disabled(!notificationsEnabled)
 
