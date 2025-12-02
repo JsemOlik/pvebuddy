@@ -39,6 +39,7 @@ struct MainTabView: View {
                 Text("VMs")
             }
 
+            ContainersView()
             .tabItem {
                 Image(systemName: "cube.transparent")
                 Text("LXCs")

@@ -66,13 +66,14 @@ final class ContainersViewModel: ObservableObject {
             switch error {
             case .invalidURL:
                 errorMessage = "The server address looks invalid. Make sure it includes the scheme, e.g. https://pve.example.com:8006."
-            case .requestFailed(let statusCode, _):
+            case .requestFailed(let statusCode, let message):
+                NSLog("❌ HTTP \(statusCode) error: %@", message)
                 if statusCode == 401 || statusCode == 403 {
                     errorMessage = "Authentication failed. Please double-check your API token ID and secret."
                 } else if statusCode == 0 || statusCode == -1 {
                     errorMessage = "Unable to reach your Proxmox server. Check the address, network, and HTTPS certificate."
                 } else {
-                    errorMessage = "Server returned an error (HTTP \(statusCode)). See the Xcode console for details."
+                    errorMessage = "Server returned an error (HTTP \(statusCode)): \(message)"
                 }
             case .decodingFailed:
                 errorMessage = "Received data in an unexpected format. Make sure your Proxmox version is supported."

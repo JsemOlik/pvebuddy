@@ -25,7 +25,7 @@ struct ContainerHardwareSection: View {
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 8)
                 } else if hardware.isEmpty {
-                    Text("No hardware information.")
+                    Text("No resource information.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 8)
@@ -58,7 +58,7 @@ struct ContainerHardwareSection: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "wrench.and.screwdriver").foregroundStyle(.blue)
-                    Text("Hardware").font(.headline)
+                    Text("Resources").font(.headline)
                     Spacer()
                     Button { onReload() } label: {
                         Image(systemName: "arrow.clockwise")

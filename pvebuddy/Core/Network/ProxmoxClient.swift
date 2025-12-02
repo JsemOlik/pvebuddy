@@ -530,6 +530,8 @@ final class ProxmoxClient {
     }
     guard 200..<300 ~= http.statusCode else {
       let body = String(data: data, encoding: .utf8) ?? "<non-UTF8 response>"
+      logger.error("HTTP \(http.statusCode) error: \(body)")
+      NSLog("❌ Proxmox API error (HTTP \(http.statusCode)): %@", body)
       throw ProxmoxClientError.requestFailed(
         statusCode: http.statusCode,
         message: body
@@ -647,64 +649,42 @@ struct JSONAny: Decodable {
 
 // MARK: - Containers (Cluster list + enrichment)
 
-private struct ClusterContainerRow: Decodable {
-  let vmid: String
-  let name: String?
-  let node: String
-  let status: String
-  let tags: String?
-
-  private enum CodingKeys: String, CodingKey { case vmid, name, node, status, tags }
-
-  init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    if let intVmid = try? c.decode(Int.self, forKey: .vmid) {
-      vmid = String(intVmid)
-    } else if let strVmid = try? c.decode(String.self, forKey: .vmid) {
-      vmid = strVmid
-    } else {
-      vmid = ""
-    }
-    name = try? c.decode(String.self, forKey: .name)
-    node = (try? c.decode(String.self, forKey: .node)) ?? ""
-    status = (try? c.decode(String.self, forKey: .status)) ?? "unknown"
-    tags = try? c.decode(String.self, forKey: .tags)
-  }
-}
-
-private struct ClusterContainersResponse: Decodable {
-  let data: [ClusterContainerRow]
-}
-
 extension ProxmoxClient {
   func fetchAllContainers() async throws -> [ProxmoxContainer] {
-    // 1) List all containers cluster-wide
-    let listURL = try makeURL(path: "/api2/json/cluster/resources?type=container")
+    // 1) Get all resources from cluster (vmid is used for both VMs and containers)
+    let listURL = try makeURL(path: "/api2/json/cluster/resources")
     let (listData, listResp) = try await dataGET(listURL)
     try ensureOK(listResp, listData)
-    let listDecoded = try JSONDecoder().decode(
-      ClusterContainersResponse.self,
-      from: listData
-    )
-    if listDecoded.data.isEmpty { return [] }
+    
+    // 2) Decode all resources and filter for LXC containers (type == "lxc")
+    let allResources: VMListResponse
+    do {
+      allResources = try JSONDecoder().decode(VMListResponse.self, from: listData)
+    } catch {
+      throw ProxmoxClientError.decodingFailed(underlying: error)
+    }
+    
+    // Filter for LXC containers (type == "lxc")
+    let containerResources = allResources.data.filter { $0.type == "lxc" }
+    if containerResources.isEmpty { return [] }
 
-    // 2) Enrich each container with status/current to get cpus/mem/etc.
-    let detailTasks = listDecoded.data.map { row in
+    // 3) For each container, fetch details from /api2/json/nodes/{node}/lxc/{vmid}/status/current
+    let detailTasks = containerResources.map { item in
       Task { () -> ProxmoxContainer? in
         do {
-          let d = try await self.fetchLXCDetail(node: row.node, vmid: row.vmid)
+          let d = try await self.fetchLXCDetail(node: item.node, vmid: item.vmid)
           return ProxmoxContainer(
-            vmid: row.vmid,
-            name: row.name ?? row.vmid,
-            node: row.node,
-            status: row.status,
+            vmid: item.vmid,
+            name: item.name,
+            node: item.node,
+            status: item.status,
             cpus: d.cpus,
             maxmem: d.maxmem,
             mem: d.mem,
             uptime: d.uptime,
             netin: d.netin,
             netout: d.netout,
-            tags: row.tags
+            tags: item.tags
           )
         } catch {
           return nil
