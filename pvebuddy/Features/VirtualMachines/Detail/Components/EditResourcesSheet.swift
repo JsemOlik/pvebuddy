@@ -15,8 +15,12 @@ struct EditResourcesSheet: View {
     @State private var sockets: Int = 1
     @State private var memoryGB: Double = 1.0
     @State private var balloonGB: Double = 0.0
+    @State private var name: String = ""
+    @State private var startAtBoot: Bool = false
+    @State private var freezeCPU: Bool = false
     @State private var isSaving = false
     @State private var saveError: String?
+    @State private var isLoadingConfig: Bool = false
 
     private let minMemoryGB: Double = 0.5
     private let maxMemoryGB: Double = 64
@@ -27,6 +31,17 @@ struct EditResourcesSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section(header: Text("General")) {
+                    TextField("Name", text: $name)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                }
+
+                Section(header: Text("Boot Options")) {
+                    Toggle("Start at boot", isOn: $startAtBoot)
+                    Toggle("Freeze CPU at startup", isOn: $freezeCPU)
+                }
+
                 if let ns = viewModel.nodeStatus {
                     Section(header: Text("Node capacity")) {
                         let nodeUsedGB = Double(ns.mem) / 1024 / 1024 / 1024
@@ -123,7 +138,7 @@ struct EditResourcesSheet: View {
                     Button(isSaving ? "Saving…" : "Save") {
                         Task { await save() }
                     }
-                    .disabled(isSaving || (cores < 1) || (sockets < 1) || (memoryGB < minMemoryGB))
+                    .disabled(isSaving || isLoadingConfig || (cores < 1) || (sockets < 1) || (memoryGB < minMemoryGB) || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
             .onAppear {
@@ -133,7 +148,9 @@ struct EditResourcesSheet: View {
                 let clamped = min(maxMemoryGB, currentMemGB)
                 memoryGB = (clamped / memoryStep).rounded() * memoryStep
                 balloonGB = min(memoryGB, max(0.0, balloonGB))
+                name = viewModel.vm.name
                 startLiveNodeTicker()
+                Task { await loadVMConfig() }
             }
             .onDisappear {
                 stopLiveNodeTicker()
@@ -146,15 +163,29 @@ struct EditResourcesSheet: View {
         saveError = nil
         let memMiB = Int((memoryGB * 1024.0).rounded())
         let balloonMiB = balloonGB > 0 ? Int((balloonGB * 1024.0).rounded()) : nil
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let nameToSave = trimmedName.isEmpty ? nil : trimmedName
 
         let err = await viewModel.updateResources(
             newCores: cores,
             newSockets: sockets,
             newMemoryMiB: memMiB,
-            newBalloonMiB: balloonMiB
+            newBalloonMiB: balloonMiB,
+            newName: nameToSave,
+            onboot: startAtBoot,
+            freeze: freezeCPU
         )
         isSaving = false
         if let err { saveError = err } else { dismiss() }
+    }
+
+    private func loadVMConfig() async {
+        isLoadingConfig = true
+        defer { isLoadingConfig = false }
+        
+        let config = await viewModel.fetchBootConfig()
+        startAtBoot = config.onboot
+        freezeCPU = config.freeze
     }
 
     private func startLiveNodeTicker() {
