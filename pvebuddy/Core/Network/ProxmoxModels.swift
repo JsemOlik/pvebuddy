@@ -108,3 +108,18 @@ struct ProxmoxVM: Decodable, Identifiable {
   let netout: Int64?
   let tags: String?
 }
+
+struct ProxmoxContainer: Decodable, Identifiable {
+  var id: String { vmid }
+  let vmid: String
+  let name: String
+  let node: String
+  let status: String
+  let cpus: Int
+  let maxmem: Int64
+  let mem: Int64
+  let uptime: Int64?
+  let netin: Int64?
+  let netout: Int64?
+  let tags: String?
+}

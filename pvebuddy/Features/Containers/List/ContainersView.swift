@@ -1,21 +1,13 @@
-//
-//  VMsView.swift
-//  pvebuddy
-//
-//  Created by Oliver Steiner on 01.12.2025.
-//
-
 import SwiftUI
 
-struct VMsView: View {
+struct ContainersView: View {
   @AppStorage("pve_server_address") private var storedServerAddress: String = ""
-  @StateObject private var viewModel: VMsViewModel
-  @State private var selectedProxmoxVM: ProxmoxVM? = nil
+  @StateObject private var viewModel: ContainersViewModel
   @State private var pickerSelection: String = "Datacenter"
 
   init() {
     let address = UserDefaults.standard.string(forKey: "pve_server_address") ?? ""
-    _viewModel = StateObject(wrappedValue: VMsViewModel(serverAddress: address))
+    _viewModel = StateObject(wrappedValue: ContainersViewModel(serverAddress: address))
   }
 
   var body: some View {
@@ -23,17 +15,11 @@ struct VMsView: View {
       ZStack {
         Color(.systemGroupedBackground).ignoresSafeArea()
 
-        if let selected = selectedProxmoxVM {
-          VmDetailView(
-            vm: selected,
-            serverAddress: storedServerAddress,
-            onBack: { selectedProxmoxVM = nil }
-          )
-        } else if viewModel.isLoading && viewModel.vms.isEmpty {
+        if viewModel.isLoading && viewModel.containers.isEmpty {
           ScrollView {
             VStack(spacing: 12) {
               ProgressView()
-              Text("Loading VMs…")
+              Text("Loading containers…")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             }
@@ -42,7 +28,7 @@ struct VMsView: View {
         } else if let message = viewModel.errorMessage {
           ScrollView {
             VStack(alignment: .leading, spacing: 8) {
-              Label("Unable to load VMs", systemImage: "exclamationmark.triangle.fill")
+              Label("Unable to load containers", systemImage: "exclamationmark.triangle.fill")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.orange)
               Text(message)
@@ -61,12 +47,12 @@ struct VMsView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(20)
           }
-        } else if viewModel.vms.isEmpty {
+        } else if viewModel.containers.isEmpty {
           ScrollView {
             VStack(alignment: .leading, spacing: 8) {
-              Text("No VMs found")
+              Text("No containers found")
                 .font(.subheadline.weight(.semibold))
-              Text("Pull down to refresh or check that you have permissions to view VMs.")
+              Text("Pull down to refresh or check your permissions.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             }
@@ -93,50 +79,25 @@ struct VMsView: View {
                   }
                 }
                 .pickerStyle(.menu)
-                // iOS 17+ preferred onChange overload
                 .onChange(of: pickerSelection) { _, new in
                   viewModel.selectedNode = (new == "Datacenter") ? nil : new
                   Task { await viewModel.refresh() }
                 }
-                .onAppear {
-                  viewModel.selectedNode = nil
-                }
+                .onAppear { viewModel.selectedNode = nil }
               }
 
               VStack(spacing: 12) {
-                ForEach(viewModel.vms) { vm in
-                  Button(action: { selectedProxmoxVM = vm }) {
-                    vmCard(vm)
-                  }
-                  .buttonStyle(.plain)
+                ForEach(viewModel.containers) { ct in
+                  containerCard(ct)
                 }
               }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 24)
           }
-          .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-              Menu {
-                Button { } label: {
-                  Label("Bulk Start", systemImage: "play.fill")
-                }
-                Button { } label: {
-                  Label("Bulk Shutdown", systemImage: "power")
-                }
-                Button { } label: {
-                  Label("Bulk Suspend", systemImage: "pause.fill")
-                }
-              } label: {
-                Image(systemName: "square.grid.2x2")
-              }
-              .buttonStyle(.plain)
-              .accessibilityLabel("Bulk Actions")
-            }
-          }
         }
       }
-      .navigationTitle("VMs")
+      .navigationTitle("LXCs")
       .navigationBarTitleDisplayMode(.large)
       .navigationBarBackButtonHidden(true)
       .onAppear {
@@ -144,19 +105,7 @@ struct VMsView: View {
         Task { await viewModel.refresh() }
       }
       .onDisappear { viewModel.stopAutoRefresh() }
-      .refreshable {
-        if selectedProxmoxVM == nil {
-          await viewModel.refresh()
-        }
-      }
-      .onChange(of: selectedProxmoxVM?.id) { _, newId in
-        if newId != nil {
-          viewModel.stopAutoRefresh()
-        } else {
-          viewModel.startAutoRefresh()
-          Task { await viewModel.refresh() }
-        }
-      }
+      .refreshable { await viewModel.refresh() }
     }
   }
 
@@ -178,8 +127,8 @@ struct VMsView: View {
               .foregroundStyle(.white)
           )
         VStack(alignment: .leading, spacing: 2) {
-          Text("Virtual Machines").font(.title2.bold())
-          Text("Manage your VMs and containers.")
+          Text("Containers").font(.title2.bold())
+          Text("Manage your LXC containers.")
             .font(.subheadline)
             .foregroundStyle(.secondary)
         }
@@ -187,13 +136,13 @@ struct VMsView: View {
     }
   }
 
-  private func vmCard(_ vm: ProxmoxVM) -> some View {
-    let memUsedGB = Double(vm.mem) / 1024.0 / 1024.0 / 1024.0
-    let memMaxGB = Double(vm.maxmem) / 1024.0 / 1024.0 / 1024.0
+  private func containerCard(_ ct: ProxmoxContainer) -> some View {
+    let memUsedGB = Double(ct.mem) / 1024.0 / 1024.0 / 1024.0
+    let memMaxGB = Double(ct.maxmem) / 1024.0 / 1024.0 / 1024.0
 
     return VStack(alignment: .leading, spacing: 12) {
       HStack(alignment: .center, spacing: 10) {
-        if let imageName = distroImageName(from: vm.tags) {
+        if let imageName = distroImageName(from: ct.tags) {
           Image(imageName)
             .resizable()
             .scaledToFill()
@@ -202,17 +151,17 @@ struct VMsView: View {
         }
 
         VStack(alignment: .leading, spacing: 4) {
-          Text(vm.name).font(.subheadline.weight(.semibold))
-          Text(vm.node).font(.caption).foregroundStyle(.secondary)
+          Text(ct.name).font(.subheadline.weight(.semibold))
+          Text(ct.node).font(.caption).foregroundStyle(.secondary)
         }
         Spacer()
-        statusBadge(vm.status)
+        statusBadge(ct.status)
       }
 
       HStack(spacing: 16) {
         HStack(spacing: 6) {
           Image(systemName: "cpu").font(.caption).foregroundStyle(.blue)
-          Text("0/\(vm.cpus) cores")
+          Text("\(ct.cpus) cores")
             .font(.caption)
             .foregroundStyle(.secondary)
         }
@@ -287,3 +236,4 @@ struct VMsView: View {
     return nil
   }
 }
+

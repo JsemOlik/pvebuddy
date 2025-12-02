@@ -38,12 +38,13 @@ struct MainTabView: View {
                 Image(systemName: "display")
                 Text("VMs")
             }
-            
+
+            ContainersView()
             .tabItem {
                 Image(systemName: "cube.transparent")
                 Text("LXCs")
             }
-            
+
             NavigationStack {
                 SettingsView()
             }

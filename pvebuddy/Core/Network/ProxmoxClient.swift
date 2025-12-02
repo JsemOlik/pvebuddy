@@ -160,6 +160,57 @@ final class ProxmoxClient {
     catch { throw ProxmoxClientError.decodingFailed(underlying: error) }
   }
 
+  // MARK: - LXC Containers
+
+  func fetchAllContainers() async throws -> [ProxmoxContainer] {
+    let listUrl = try makeURL(path: "/api2/json/cluster/resources?type=vm")
+    var req = URLRequest(url: listUrl)
+    req.httpMethod = "GET"
+    applyAuth(&req)
+    let (listData, listResponse) = try await URLSession.shared.data(for: req)
+    try ensureOK(listResponse, listData)
+
+    let listDecoded: VMListResponse
+    do { listDecoded = try JSONDecoder().decode(VMListResponse.self, from: listData) }
+    catch { throw ProxmoxClientError.decodingFailed(underlying: error) }
+    let lxcItems = listDecoded.data.filter { $0.type.lowercased() == "lxc" }
+    if lxcItems.isEmpty { return [] }
+
+    let detailTasks = lxcItems.map { item in
+      Task { () -> ProxmoxContainer? in
+        do {
+          let d = try await self.fetchLXCDetail(node: item.node, vmid: item.vmid)
+          return ProxmoxContainer(
+            vmid: item.vmid,
+            name: item.name,
+            node: item.node,
+            status: item.status,
+            cpus: d.cpus,
+            maxmem: d.maxmem,
+            mem: d.mem,
+            uptime: d.uptime,
+            netin: d.netin,
+            netout: d.netout,
+            tags: item.tags
+          )
+        } catch { return nil }
+      }
+    }
+    var containers: [ProxmoxContainer] = []
+    for t in detailTasks { if let ct = await t.value { containers.append(ct) } }
+    return containers
+  }
+
+  func fetchLXCDetail(node: String, vmid: String) async throws -> ProxmoxVMDetail {
+    let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
+    let vmidEnc = vmid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? vmid
+    let url = try makeURL(path: "/api2/json/nodes/\(nodeEnc)/lxc/\(vmidEnc)/status/current")
+    let (data, resp) = try await dataGET(url)
+    try ensureOK(resp, data)
+    do { return try JSONDecoder().decode(VMDetailResponse.self, from: data).data }
+    catch { throw ProxmoxClientError.decodingFailed(underlying: error) }
+  }
+
   struct VMCurrentStatus {
     let status: String
     let cpuFraction: Double
