@@ -1,3 +1,10 @@
+//
+//  EditServerInfoView.swift
+//  pvebuddy
+//
+//  Created by Oliver Steiner on 01.12.2025.
+//
+
 import SwiftUI
 
 struct EditServerInfoView: View {
