@@ -5,6 +5,13 @@ All notable changes to PVE Buddy will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1](https://github.com/JsemOlik/pvebuddy/compare/v1.0.0...v1.0.1) (2025-12-02)
+
+
+### 🐛 Bug Fixes
+
+* error fix ([ce5a39b](https://github.com/JsemOlik/pvebuddy/commit/ce5a39be433b389df10a5979a32b4059ac6be32b))
+
 ## 1.0.0 (2025-12-02)
 
 
