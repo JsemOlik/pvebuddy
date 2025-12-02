@@ -23,6 +23,7 @@
 
 import SwiftUI
 import UserNotifications
+import BackgroundTasks
 
 @main
 struct pvebuddyApp: App {
@@ -35,6 +36,9 @@ struct pvebuddyApp: App {
     init() {
         // Set up notification delegate
         UNUserNotificationCenter.current().delegate = notificationDelegate
+        
+        // Register background task
+        BackgroundTaskManager.shared.registerBackgroundTask()
     }
     
     var body: some Scene {
@@ -53,9 +57,17 @@ struct pvebuddyApp: App {
                         let authStatus = await NotificationManager.shared.checkAuthorizationStatus()
                         if authStatus == .authorized {
                             VMMonitorService.shared.startMonitoring(serverAddress: serverAddress)
+                            // Also schedule background task
+                            BackgroundTaskManager.shared.scheduleBackgroundTask()
                         }
                     }
                 }
+            }
+        }
+        .onChange(of: notificationsEnabled) { _, newValue in
+            if newValue {
+                // Schedule background task when notifications are enabled
+                BackgroundTaskManager.shared.scheduleBackgroundTask()
             }
         }
     }

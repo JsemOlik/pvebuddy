@@ -76,6 +76,14 @@ final class VMMonitorService: ObservableObject {
     private func loadInitialVMStates() async {
         guard let client = client else { return }
         
+        // Try to load from UserDefaults first (for background task continuity)
+        let previousStatesKey = "vm_monitor_previous_states"
+        if let data = UserDefaults.standard.data(forKey: previousStatesKey),
+           let decoded = try? JSONDecoder().decode([String: String].self, from: data) {
+            previousVMStates = decoded
+            print("📊 Loaded \(previousVMStates.count) previous states from storage")
+        }
+        
         do {
             // Use the lightweight endpoint that doesn't fetch details
             let vmItems = try await client.fetchVMListWithStatuses()
@@ -85,6 +93,11 @@ final class VMMonitorService: ObservableObject {
                 let status = item.status.lowercased()
                 previousVMStates[key] = status
                 print("  - VM \(item.name) (\(item.vmid)): \(status)")
+            }
+            
+            // Save to UserDefaults for background tasks
+            if let encoded = try? JSONEncoder().encode(previousVMStates) {
+                UserDefaults.standard.set(encoded, forKey: previousStatesKey)
             }
         } catch {
             print("❌ Failed to load initial VM states: \(error)")
@@ -173,6 +186,12 @@ final class VMMonitorService: ObservableObject {
             
             // Update previous states
             previousVMStates = newStates
+            
+            // Save to UserDefaults for background tasks
+            if let encoded = try? JSONEncoder().encode(previousVMStates) {
+                UserDefaults.standard.set(encoded, forKey: "vm_monitor_previous_states")
+            }
+            
             print("✅ State check complete. Updated states: \(previousVMStates.count)")
         } catch {
             print("❌ Failed to check VM states: \(error)")

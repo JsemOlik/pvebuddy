@@ -84,6 +84,10 @@ struct MainTabView: View {
                 await startMonitoringIfNeeded()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+            // Schedule background task when app goes to background
+            BackgroundTaskManager.shared.scheduleBackgroundTask()
+        }
     }
     
     private func startMonitoringIfNeeded() async {
