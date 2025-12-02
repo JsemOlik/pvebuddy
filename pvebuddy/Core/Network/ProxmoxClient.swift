@@ -233,6 +233,22 @@ final class ProxmoxClient {
     return try JSONDecoder().decode(RRDResponse.self, from: data).data
   }
 
+  func fetchLXCRRD(
+    node: String,
+    vmid: String,
+    timeframe: String = "hour",
+    cf: String = "AVERAGE"
+  ) async throws -> [RRDEntry] {
+    let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
+    let vmidEnc = vmid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? vmid
+    let url = try makeURL(
+      path: "/api2/json/nodes/\(nodeEnc)/lxc/\(vmidEnc)/rrd?timeframe=\(timeframe)&cf=\(cf)"
+    )
+    let (data, resp) = try await dataGET(url)
+    try ensureOK(resp, data)
+    return try JSONDecoder().decode(RRDResponse.self, from: data).data
+  }
+
   // MARK: - VM Power Actions
 
   func startVM(node: String, vmid: String) async throws {
