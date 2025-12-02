@@ -1,0 +1,12 @@
+{
+  "name": "pvebuddy",
+  "version": "0.0.0",
+  "description": "A clean, privacy-respecting iOS app for monitoring and managing your Proxmox VE cluster",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JsemOlik/pvebuddy.git"
+  },
+  "author": "Oliver Steiner (JsemOlik)",
+  "license": "GPL-3.0",
+  "private": true
+}
