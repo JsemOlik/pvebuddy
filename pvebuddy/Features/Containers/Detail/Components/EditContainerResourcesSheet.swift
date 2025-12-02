@@ -113,7 +113,30 @@ struct EditContainerResourcesSheet: View {
                 cores = max(1, viewModel.container.cpus)
                 let clamped = min(maxMemoryGB, currentMemGB)
                 memoryGB = (clamped / memoryStep).rounded() * memoryStep
-                swapGB = min(memoryGB, max(0.0, swapGB))
+                
+                // Load current swap value from config if available
+                if let swapValue = viewModel.rawConfig["swap"], 
+                   let swapMiB = Int(swapValue) {
+                    let swapGBValue = Double(swapMiB) / 1024.0
+                    swapGB = min(memoryGB, max(0.0, (swapGBValue / memoryStep).rounded() * memoryStep))
+                } else {
+                    // If config not loaded yet, load it and then update swap
+                    Task {
+                        if viewModel.rawConfig.isEmpty {
+                            await viewModel.loadHardware()
+                        }
+                        
+                        // Update swap after config is loaded
+                        if let swapValue = viewModel.rawConfig["swap"], 
+                           let swapMiB = Int(swapValue) {
+                            let swapGBValue = Double(swapMiB) / 1024.0
+                            await MainActor.run {
+                                swapGB = min(memoryGB, max(0.0, (swapGBValue / memoryStep).rounded() * memoryStep))
+                            }
+                        }
+                    }
+                }
+                
                 startLiveNodeTicker()
             }
             .onDisappear {

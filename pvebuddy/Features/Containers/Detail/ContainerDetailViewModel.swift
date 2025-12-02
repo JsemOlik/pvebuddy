@@ -37,6 +37,7 @@ final class ContainerDetailViewModel: ObservableObject {
   @Published var hardware: [HardwareSection] = []
   @Published var hardwareLoading: Bool = false
   @Published var hardwareError: String?
+  @Published var rawConfig: [String: String] = [:]
 
   struct HardwareItem: Identifiable { let id = UUID(); let key: String; let value: String }
   struct HardwareSection: Identifiable { let id = UUID(); let title: String; let items: [HardwareItem] }
@@ -270,9 +271,11 @@ final class ContainerDetailViewModel: ObservableObject {
         node: self.initialContainer.node,
         vmid: self.initialContainer.vmid
       )
+      self.rawConfig = cfg
       self.hardware = Self.groupConfig(cfg)
     } catch {
       self.hardware = []
+      self.rawConfig = [:]
       self.hardwareError = "Failed to load hardware: \(error.localizedDescription)"
     }
   }
