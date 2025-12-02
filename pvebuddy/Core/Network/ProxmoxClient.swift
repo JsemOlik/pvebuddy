@@ -400,7 +400,8 @@ final class ProxmoxClient {
     vmid: String,
     cores: Int?,
     memoryMiB: Int?,
-    swapMiB: Int?
+    swapMiB: Int?,
+    onboot: Bool?
   ) async throws {
     let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
     let vmidEnc = vmid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? vmid
@@ -410,6 +411,7 @@ final class ProxmoxClient {
     if let cores { form["cores"] = String(cores) }
     if let memoryMiB { form["memory"] = String(memoryMiB) }
     if let swapMiB { form["swap"] = String(swapMiB) }
+    if let onboot { form["onboot"] = onboot ? "1" : "0" }
 
     let (data, resp) = try await dataPUTForm(url, form: form)
     try ensureOK(resp, data)
