@@ -5,6 +5,14 @@ All notable changes to PVE Buddy will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0](https://github.com/JsemOlik/pvebuddy/compare/v1.2.0...v1.3.0) (2025-12-02)
+
+
+### ✨ Features
+
+* cpu and memory usage graphs in VM's and LXC's details ([fb29277](https://github.com/JsemOlik/pvebuddy/commit/fb29277e2e8d44314081be818d0d89c4660a8575))
+* notification for vm power off ([d548c1b](https://github.com/JsemOlik/pvebuddy/commit/d548c1bf5c533b5ba49202046dd835104ebefbe6))
+
 ## [1.2.0](https://github.com/JsemOlik/pvebuddy/compare/v1.1.0...v1.2.0) (2025-12-02)
 
 
