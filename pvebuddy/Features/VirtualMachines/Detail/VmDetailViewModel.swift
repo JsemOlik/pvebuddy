@@ -42,6 +42,16 @@ final class VMDetailViewModel: ObservableObject {
   @Published var storagesLoading: Bool = false
   @Published var storagesError: String?
 
+  struct VMDisk: Identifiable {
+    let id: String
+    let device: String // e.g., "scsi0", "sata0"
+    let storage: String
+    let size: Int64? // in bytes, if available
+    let isBoot: Bool
+    let rawValue: String
+  }
+  @Published var vmDisks: [VMDisk] = []
+
   struct HardwareItem: Identifiable { let id = UUID(); let key: String; let value: String }
   struct HardwareSection: Identifiable { let id = UUID(); let title: String; let items: [HardwareItem] }
 
@@ -302,14 +312,99 @@ final class VMDetailViewModel: ObservableObject {
     defer { storagesLoading = false }
 
     do {
-      var allStorages = try await self.client.fetchStorages(for: self.initialVM.node)
-      // Sort by available space (least to most)
-      allStorages.sort { $0.avail < $1.avail }
-      self.storages = allStorages
+      let cfg = try await self.client.fetchVMConfig(
+        node: self.initialVM.node,
+        vmid: self.initialVM.vmid
+      )
+      
+      // Parse disks from config
+      var disks: [VMDisk] = []
+      let bootdisk = cfg["bootdisk"] ?? ""
+      let diskPrefixes = ["scsi", "sata", "ide", "virtio", "efidisk", "tpmstate"]
+      
+      for (key, value) in cfg {
+        for prefix in diskPrefixes {
+          if key.hasPrefix(prefix) {
+            let isBoot = bootdisk == key || bootdisk.hasPrefix(prefix)
+            let parsed = parseDiskConfig(key: key, value: value, isBoot: isBoot)
+            disks.append(parsed)
+            break
+          }
+        }
+      }
+      
+      // Sort by available space (least to most) if size is available, otherwise by device name
+      disks.sort { disk1, disk2 in
+        if let size1 = disk1.size, let size2 = disk2.size {
+          return size1 < size2
+        }
+        return disk1.device < disk2.device
+      }
+      
+      self.vmDisks = disks
     } catch {
-      self.storages = []
-      self.storagesError = "Failed to load storages: \(error.localizedDescription)"
+      self.vmDisks = []
+      self.storagesError = "Failed to load disks: \(error.localizedDescription)"
     }
+  }
+
+  private func parseDiskConfig(key: String, value: String, isBoot: Bool) -> VMDisk {
+    // Parse disk config like "local:100/vm-100-disk-0.qcow2,size=32G"
+    // or "local-lvm:vm-100-disk-0,size=32G"
+    // or "local:100/vm-100-disk-0.qcow2"
+    var storage = ""
+    var size: Int64? = nil
+    
+    // Extract storage and size
+    if let colonIndex = value.firstIndex(of: ":") {
+      storage = String(value[..<colonIndex])
+      let afterColon = String(value[value.index(after: colonIndex)...])
+      
+      // Check for size parameter (can be in format "size=32G" or ",size=32G")
+      let components = afterColon.split(separator: ",")
+      for component in components {
+        let trimmed = component.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("size=") {
+          let sizeStr = String(trimmed.dropFirst(5)) // Remove "size="
+          size = parseSize(sizeStr)
+          break
+        }
+      }
+    } else {
+      storage = value
+    }
+    
+    return VMDisk(
+      id: key,
+      device: key,
+      storage: storage,
+      size: size,
+      isBoot: isBoot,
+      rawValue: value
+    )
+  }
+
+  private func parseSize(_ sizeStr: String) -> Int64? {
+    // Parse size like "32G", "500M", "1T"
+    let trimmed = sizeStr.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    
+    let lastChar = trimmed.last?.lowercased()
+    guard let multiplier = lastChar else { return nil }
+    
+    let numberStr = String(trimmed.dropLast())
+    guard let number = Double(numberStr) else { return nil }
+    
+    let bytes: Double
+    switch multiplier {
+    case "k": bytes = number * 1024
+    case "m": bytes = number * 1024 * 1024
+    case "g": bytes = number * 1024 * 1024 * 1024
+    case "t": bytes = number * 1024 * 1024 * 1024 * 1024
+    default: return nil
+    }
+    
+    return Int64(bytes)
   }
 
   private static func groupConfig(_ cfg: [String: String]) -> [HardwareSection] {

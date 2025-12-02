@@ -1,5 +1,5 @@
 //
-//  VmStorageSection.swift
+//  VmFormattedHardwareView.swift
 //  pvebuddy
 //
 //  Created by Oliver Steiner on 02.12.2025.
@@ -7,8 +7,8 @@
 
 import SwiftUI
 
-struct VmStorageSection: View {
-    let disks: [VMDetailViewModel.VMDisk]
+struct VmFormattedHardwareView: View {
+    let hardware: [VMDetailViewModel.HardwareSection]
     let loading: Bool
     let error: String?
     let onReload: () -> Void
@@ -16,7 +16,7 @@ struct VmStorageSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Attached Disks")
+                Text("Hardware")
                     .font(.title2.weight(.bold))
                 Spacer()
                 if loading {
@@ -33,7 +33,7 @@ struct VmStorageSection: View {
 
             if let error = error {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("Error loading disks", systemImage: "exclamationmark.triangle.fill")
+                    Label("Error loading hardware", systemImage: "exclamationmark.triangle.fill")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.orange)
                     Text(error)
@@ -50,12 +50,12 @@ struct VmStorageSection: View {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .strokeBorder(Color.orange.opacity(0.3), lineWidth: 0.5)
                 )
-            } else if disks.isEmpty && !loading {
+            } else if hardware.isEmpty && !loading {
                 VStack(spacing: 12) {
-                    Image(systemName: "externaldrive")
+                    Image(systemName: "wrench.and.screwdriver")
                         .font(.system(size: 32))
                         .foregroundStyle(.secondary)
-                    Text("No disks attached")
+                    Text("No hardware information")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -63,8 +63,8 @@ struct VmStorageSection: View {
                 .padding(.vertical, 32)
             } else {
                 VStack(spacing: 12) {
-                    ForEach(disks) { disk in
-                        VMDiskItemView(disk: disk)
+                    ForEach(hardware) { section in
+                        HardwareCategoryView(section: section)
                     }
                 }
             }
@@ -81,53 +81,52 @@ struct VmStorageSection: View {
     }
 }
 
-private struct VMDiskItemView: View {
-    let disk: VMDetailViewModel.VMDisk
+private struct HardwareCategoryView: View {
+    let section: VMDetailViewModel.HardwareSection
+    @State private var isExpanded: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(disk.device.uppercased())
-                            .font(.headline)
-                        if disk.isBoot {
-                            Text("BOOT")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(
-                                    Capsule()
-                                        .fill(Color.blue)
-                                )
-                        }
-                    }
-                    
-                    Text(disk.storage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                if let size = disk.size {
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text(ByteFormatter.format(size))
-                            .font(.subheadline.weight(.semibold))
-                        
-                        Text("size")
-                            .font(.caption2)
+        DisclosureGroup(isExpanded: $isExpanded) {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(section.items) { item in
+                    HStack {
+                        Text(item.key)
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(item.value)
+                            .font(.subheadline.weight(.medium))
+                            .multilineTextAlignment(.trailing)
+                    }
+                    .padding(.vertical, 4)
+                    
+                    if item.id != section.items.last?.id {
+                        Divider()
                     }
                 }
             }
-
-            if let size = disk.size {
-                let sizeGB = Double(size) / 1024 / 1024 / 1024
-                Text(String(format: "Size: %.1f GB", sizeGB))
-                    .font(.footnote)
+            .padding(.top, 8)
+        } label: {
+            HStack {
+                Image(systemName: iconForSection(section.title))
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.blue)
+                    .frame(width: 24)
+                
+                Text(section.title)
+                    .font(.headline)
+                
+                Spacer()
+                
+                Text("\(section.items.count)")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(Color(.secondarySystemBackground))
+                    )
             }
         }
         .padding(14)
@@ -135,6 +134,20 @@ private struct VMDiskItemView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color(.secondarySystemBackground))
         )
+    }
+
+    private func iconForSection(_ title: String) -> String {
+        switch title {
+        case "CPU & Memory": return "cpu"
+        case "Boot": return "power"
+        case "Disks": return "externaldrive"
+        case "Network": return "network"
+        case "Display": return "display"
+        case "Controllers & Misc": return "slider.horizontal.3"
+        case "PCI Passthrough": return "pci-card"
+        case "Cloud-Init": return "cloud"
+        default: return "gearshape"
+        }
     }
 }
 
