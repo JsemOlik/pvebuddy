@@ -1,10 +1,3 @@
-//
-//  ProxmoxClient.swift
-//  pvebuddy
-//
-//  Created by Oliver Steiner on 01.12.2025.
-//
-
 import Foundation
 import os.log
 
@@ -72,8 +65,11 @@ final class ProxmoxClient {
     let url = try makeURL(path: "/api2/json/nodes")
     let (data, resp) = try await dataGET(url)
     try ensureOK(resp, data)
-    do { return try JSONDecoder().decode(NodesResponse.self, from: data).data.map { $0.node } }
-    catch { throw ProxmoxClientError.decodingFailed(underlying: error) }
+    do {
+      return try JSONDecoder().decode(NodesResponse.self, from: data).data.map { $0.node }
+    } catch {
+      throw ProxmoxClientError.decodingFailed(underlying: error)
+    }
   }
 
   func fetchAllStatus() async throws -> ProxmoxNodeStatus {
@@ -89,7 +85,14 @@ final class ProxmoxClient {
     let swapSum = statuses.map { $0.swap }.reduce(0, +)
     let maxSwapSum = statuses.map { $0.maxswap }.reduce(0, +)
     let waitAvg = statuses.map { $0.wait }.reduce(0, +) / Double(statuses.count)
-    return ProxmoxNodeStatus(cpu: cpuAvg, mem: memSum, maxmem: maxMemSum, swap: swapSum, maxswap: maxSwapSum, wait: waitAvg)
+    return ProxmoxNodeStatus(
+      cpu: cpuAvg,
+      mem: memSum,
+      maxmem: maxMemSum,
+      swap: swapSum,
+      maxswap: maxSwapSum,
+      wait: waitAvg
+    )
   }
 
   func fetchStatus(for node: String) async throws -> ProxmoxNodeStatus {
@@ -110,7 +113,7 @@ final class ProxmoxClient {
     catch { throw ProxmoxClientError.decodingFailed(underlying: error) }
   }
 
-  // MARK: - VMs
+  // MARK: - VMs (QEMU)
 
   func fetchAllVMs() async throws -> [ProxmoxVM] {
     let listUrl = try makeURL(path: "/api2/json/cluster/resources?type=vm")
@@ -142,7 +145,9 @@ final class ProxmoxClient {
             netout: d.netout,
             tags: item.tags
           )
-        } catch { return nil }
+        } catch {
+          return nil
+        }
       }
     }
     var vms: [ProxmoxVM] = []
@@ -180,7 +185,12 @@ final class ProxmoxClient {
     let cpuFraction = d["cpu"]?.double ?? 0.0
     let memUsed = Int64(d["mem"]?.double ?? 0.0)
     let memMax = Int64(d["maxmem"]?.double ?? 0.0)
-    return VMCurrentStatus(status: status, cpuFraction: cpuFraction, memUsed: memUsed, memMax: memMax)
+    return VMCurrentStatus(
+      status: status,
+      cpuFraction: cpuFraction,
+      memUsed: memUsed,
+      memMax: memMax
+    )
   }
 
   // MARK: - VM Time-series (RRD)
@@ -193,35 +203,73 @@ final class ProxmoxClient {
   }
   private struct RRDResponse: Decodable { let data: [RRDEntry] }
 
-  func fetchVMRRD(node: String, vmid: String, timeframe: String = "hour", cf: String = "AVERAGE") async throws -> [RRDEntry] {
+  func fetchVMRRD(
+    node: String,
+    vmid: String,
+    timeframe: String = "hour",
+    cf: String = "AVERAGE"
+  ) async throws -> [RRDEntry] {
     let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
     let vmidEnc = vmid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? vmid
-    let url = try makeURL(path: "/api2/json/nodes/\(nodeEnc)/qemu/\(vmidEnc)/rrd?timeframe=\(timeframe)&cf=\(cf)")
+    let url = try makeURL(
+      path: "/api2/json/nodes/\(nodeEnc)/qemu/\(vmidEnc)/rrd?timeframe=\(timeframe)&cf=\(cf)"
+    )
     let (data, resp) = try await dataGET(url)
     try ensureOK(resp, data)
     return try JSONDecoder().decode(RRDResponse.self, from: data).data
   }
 
-  // Optional: Node RRD if you later need time-series at node level
-  func fetchNodeRRD(node: String, timeframe: String = "hour", cf: String = "AVERAGE") async throws -> [RRDEntry] {
+  func fetchNodeRRD(
+    node: String,
+    timeframe: String = "hour",
+    cf: String = "AVERAGE"
+  ) async throws -> [RRDEntry] {
     let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
-    let url = try makeURL(path: "/api2/json/nodes/\(nodeEnc)/rrd?timeframe=\(timeframe)&cf=\(cf)")
+    let url = try makeURL(
+      path: "/api2/json/nodes/\(nodeEnc)/rrd?timeframe=\(timeframe)&cf=\(cf)"
+    )
     let (data, resp) = try await dataGET(url)
     try ensureOK(resp, data)
     return try JSONDecoder().decode(RRDResponse.self, from: data).data
   }
 
-  // MARK: - Power Actions
+  func fetchLXCRRD(
+    node: String,
+    vmid: String,
+    timeframe: String = "hour",
+    cf: String = "AVERAGE"
+  ) async throws -> [RRDEntry] {
+    let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
+    let vmidEnc = vmid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? vmid
+    let url = try makeURL(
+      path: "/api2/json/nodes/\(nodeEnc)/lxc/\(vmidEnc)/rrd?timeframe=\(timeframe)&cf=\(cf)"
+    )
+    let (data, resp) = try await dataGET(url)
+    try ensureOK(resp, data)
+    return try JSONDecoder().decode(RRDResponse.self, from: data).data
+  }
+
+  // MARK: - VM Power Actions
 
   func startVM(node: String, vmid: String) async throws {
     let upid = try await postStatusAction(node: node, vmid: vmid, action: "start")
     try await waitForTask(node: node, upid: upid)
   }
 
-  func shutdownVM(node: String, vmid: String, force: Bool = false, timeout: Int? = nil) async throws {
+  func shutdownVM(
+    node: String,
+    vmid: String,
+    force: Bool = false,
+    timeout: Int? = nil
+  ) async throws {
     var params: [String: String] = [:]
     if let timeout { params["timeout"] = String(timeout) }
-    let upid = try await postStatusAction(node: node, vmid: vmid, action: "shutdown", form: params)
+    let upid = try await postStatusAction(
+      node: node,
+      vmid: vmid,
+      action: "shutdown",
+      form: params
+    )
     do {
       try await waitForTask(node: node, upid: upid)
     } catch {
@@ -253,7 +301,9 @@ final class ProxmoxClient {
       var out: [String: String] = [:]
       for (k, v) in decoded.data { out[k] = v.displayString }
       return out
-    } catch { throw ProxmoxClientError.decodingFailed(underlying: error) }
+    } catch {
+      throw ProxmoxClientError.decodingFailed(underlying: error)
+    }
   }
 
   // MARK: - VM Config Update (Resources)
@@ -280,6 +330,108 @@ final class ProxmoxClient {
     try ensureOK(resp, data)
   }
 
+  // MARK: - LXC Power Actions
+
+  func startLXC(node: String, vmid: String) async throws {
+    let upid = try await postLXCStatusAction(node: node, vmid: vmid, action: "start")
+    try await waitForTask(node: node, upid: upid)
+  }
+
+  func shutdownLXC(
+    node: String,
+    vmid: String,
+    force: Bool = false,
+    timeout: Int? = nil
+  ) async throws {
+    var params: [String: String] = [:]
+    if let timeout { params["timeout"] = String(timeout) }
+    let upid = try await postLXCStatusAction(
+      node: node,
+      vmid: vmid,
+      action: "shutdown",
+      form: params
+    )
+    do {
+      try await waitForTask(node: node, upid: upid)
+    } catch {
+      if force { try await stopLXC(node: node, vmid: vmid) }
+      else { throw error }
+    }
+  }
+
+  func rebootLXC(node: String, vmid: String) async throws {
+    let upid = try await postLXCStatusAction(node: node, vmid: vmid, action: "reboot")
+    try await waitForTask(node: node, upid: upid)
+  }
+
+  func stopLXC(node: String, vmid: String) async throws {
+    let upid = try await postLXCStatusAction(node: node, vmid: vmid, action: "stop")
+    try await waitForTask(node: node, upid: upid)
+  }
+
+  // MARK: - LXC Config
+
+  func fetchLXCConfig(node: String, vmid: String) async throws -> [String: String] {
+    let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
+    let vmidEnc = vmid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? vmid
+    let url = try makeURL(path: "/api2/json/nodes/\(nodeEnc)/lxc/\(vmidEnc)/config")
+    let (data, resp) = try await dataGET(url)
+    try ensureOK(resp, data)
+    do {
+      let decoded = try JSONDecoder().decode(ProxmoxVMConfigResponse.self, from: data)
+      var out: [String: String] = [:]
+      for (k, v) in decoded.data { out[k] = v.displayString }
+      return out
+    } catch {
+      throw ProxmoxClientError.decodingFailed(underlying: error)
+    }
+  }
+
+  // MARK: - LXC Config Update (Resources)
+
+  func updateLXCResources(
+    node: String,
+    vmid: String,
+    cores: Int?,
+    memoryMiB: Int?,
+    swapMiB: Int?
+  ) async throws {
+    let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
+    let vmidEnc = vmid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? vmid
+    let url = try makeURL(path: "/api2/json/nodes/\(nodeEnc)/lxc/\(vmidEnc)/config")
+
+    var form: [String: String] = [:]
+    if let cores { form["cores"] = String(cores) }
+    if let memoryMiB { form["memory"] = String(memoryMiB) }
+    if let swapMiB { form["swap"] = String(swapMiB) }
+
+    let (data, resp) = try await dataPUTForm(url, form: form)
+    try ensureOK(resp, data)
+  }
+
+  // MARK: - LXC Current Status
+
+  func fetchLXCCurrentStatus(node: String, vmid: String) async throws -> VMCurrentStatus {
+    let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
+    let vmidEnc = vmid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? vmid
+    let url = try makeURL(path: "/api2/json/nodes/\(nodeEnc)/lxc/\(vmidEnc)/status/current")
+    let (data, resp) = try await dataGET(url)
+    try ensureOK(resp, data)
+    struct Raw: Decodable { let data: [String: JSONAny] }
+    let raw = try JSONDecoder().decode(Raw.self, from: data)
+    let d = raw.data
+    let status = d["status"]?.string ?? "unknown"
+    let cpuFraction = d["cpu"]?.double ?? 0.0
+    let memUsed = Int64(d["mem"]?.double ?? 0.0)
+    let memMax = Int64(d["maxmem"]?.double ?? 0.0)
+    return VMCurrentStatus(
+      status: status,
+      cpuFraction: cpuFraction,
+      memUsed: memUsed,
+      memMax: memMax
+    )
+  }
+
   // MARK: - Web Login (Browser Ticket)
 
   struct LoginTicketResponse: Decodable {
@@ -291,21 +443,30 @@ final class ProxmoxClient {
     }
   }
 
-  func loginForWebTicket(username: String, password: String, realm: String = "pam") async throws -> (ticket: String, csrf: String?) {
+  func loginForWebTicket(
+    username: String,
+    password: String,
+    realm: String = "pam"
+  ) async throws -> (ticket: String, csrf: String?) {
     let url = try makeURL(path: "/api2/json/access/ticket")
 
     var req = URLRequest(url: url)
     req.httpMethod = "POST"
-    req.setValue("application/x-www-form-urlencoded; charset=utf-8", forHTTPHeaderField: "Content-Type")
+    req.setValue(
+      "application/x-www-form-urlencoded; charset=utf-8",
+      forHTTPHeaderField: "Content-Type"
+    )
 
     let userWithRealm = username.contains("@") ? username : "\(username)@\(realm)"
     let bodyPairs = [
       "username": userWithRealm,
       "password": password
     ]
-    let body = bodyPairs.map { k, v in
-      "\(k)=\(v.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? v)"
-    }.joined(separator: "&")
+    let body = bodyPairs
+      .map { k, v in
+        "\(k)=\(v.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? v)"
+      }
+      .joined(separator: "&")
     req.httpBody = body.data(using: .utf8)
 
     let (data, resp) = try await URLSession.shared.data(for: req)
@@ -318,7 +479,9 @@ final class ProxmoxClient {
 
   private func makeURL(path: String) throws -> URL {
     let base = baseAddress.hasSuffix("/") ? String(baseAddress.dropLast()) : baseAddress
-    guard let url = URL(string: base + path) else { throw ProxmoxClientError.invalidURL }
+    guard let url = URL(string: base + path) else {
+      throw ProxmoxClientError.invalidURL
+    }
     return url
   }
 
@@ -336,13 +499,44 @@ final class ProxmoxClient {
     return try await URLSession.shared.data(for: req)
   }
 
-  private func dataPOSTForm(_ url: URL, form: [String: String] = [:]) async throws -> (Data, URLResponse) {
+  private func dataPOSTForm(
+    _ url: URL,
+    form: [String: String] = [:]
+  ) async throws -> (Data, URLResponse) {
     var req = URLRequest(url: url)
     req.httpMethod = "POST"
     applyAuth(&req)
     if !form.isEmpty {
-      req.setValue("application/x-www-form-urlencoded; charset=utf-8", forHTTPHeaderField: "Content-Type")
-      let body = form.map { k, v in "\(k)=\(v.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? v)" }
+      req.setValue(
+        "application/x-www-form-urlencoded; charset=utf-8",
+        forHTTPHeaderField: "Content-Type"
+      )
+      let body = form
+        .map { k, v in
+          "\(k)=\(v.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? v)"
+        }
+        .joined(separator: "&")
+      req.httpBody = body.data(using: .utf8)
+    }
+    return try await URLSession.shared.data(for: req)
+  }
+
+  private func dataPUTForm(
+    _ url: URL,
+    form: [String: String] = [:]
+  ) async throws -> (Data, URLResponse) {
+    var req = URLRequest(url: url)
+    req.httpMethod = "PUT"
+    applyAuth(&req)
+    if !form.isEmpty {
+      req.setValue(
+        "application/x-www-form-urlencoded; charset=utf-8",
+        forHTTPHeaderField: "Content-Type"
+      )
+      let body = form
+        .map { k, v in
+          "\(k)=\(v.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? v)"
+        }
         .joined(separator: "&")
       req.httpBody = body.data(using: .utf8)
     }
@@ -351,25 +545,44 @@ final class ProxmoxClient {
 
   private func ensureOK(_ response: URLResponse, _ data: Data) throws {
     guard let http = response as? HTTPURLResponse else {
-      throw ProxmoxClientError.requestFailed(statusCode: -1, message: "Invalid response type")
+      throw ProxmoxClientError.requestFailed(
+        statusCode: -1,
+        message: "Invalid response type"
+      )
     }
     guard 200..<300 ~= http.statusCode else {
       let body = String(data: data, encoding: .utf8) ?? "<non-UTF8 response>"
-      throw ProxmoxClientError.requestFailed(statusCode: http.statusCode, message: body)
+      logger.error("HTTP \(http.statusCode) error: \(body)")
+      NSLog("❌ Proxmox API error (HTTP \(http.statusCode)): %@", body)
+      throw ProxmoxClientError.requestFailed(
+        statusCode: http.statusCode,
+        message: body
+      )
     }
   }
 
-  private func postStatusAction(node: String, vmid: String, action: String, form: [String: String] = [:]) async throws -> String {
+  private func postStatusAction(
+    node: String,
+    vmid: String,
+    action: String,
+    form: [String: String] = [:]
+  ) async throws -> String {
     let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
     let vmidEnc = vmid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? vmid
-    let url = try makeURL(path: "/api2/json/nodes/\(nodeEnc)/qemu/\(vmidEnc)/status/\(action)")
+    let url = try makeURL(
+      path: "/api2/json/nodes/\(nodeEnc)/qemu/\(vmidEnc)/status/\(action)"
+    )
     let (data, resp) = try await dataPOSTForm(url, form: form)
     try ensureOK(resp, data)
     do { return try JSONDecoder().decode(ProxmoxTaskUPIDResponse.self, from: data).data }
     catch { throw ProxmoxClientError.decodingFailed(underlying: error) }
   }
 
-  private func waitForTask(node: String, upid: String, timeoutSeconds: TimeInterval = 120) async throws {
+  private func waitForTask(
+    node: String,
+    upid: String,
+    timeoutSeconds: TimeInterval = 120
+  ) async throws {
     let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
     let upidEnc = upid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? upid
     let url = try makeURL(path: "/api2/json/nodes/\(nodeEnc)/tasks/\(upidEnc)/status")
@@ -380,15 +593,61 @@ final class ProxmoxClient {
       let status = try JSONDecoder().decode(ProxmoxTaskStatusResponse.self, from: data).data
       if status.status == "stopped" {
         if (status.exitstatus?.lowercased() ?? "ok") == "ok" { return }
-        else { throw ProxmoxClientError.requestFailed(statusCode: 200, message: "Task failed: \(status.exitstatus ?? "unknown")") }
+        else {
+          throw ProxmoxClientError.requestFailed(
+            statusCode: 200,
+            message: "Task failed: \(status.exitstatus ?? "unknown")"
+          )
+        }
       }
       if Date().timeIntervalSince(start) > timeoutSeconds {
-        throw ProxmoxClientError.requestFailed(statusCode: 0, message: "Task timeout")
+        throw ProxmoxClientError.requestFailed(
+          statusCode: 0,
+          message: "Task timeout"
+        )
       }
       try? await Task.sleep(nanoseconds: 1_000_000_000)
     }
   }
+
+  // MARK: - LXC Helper
+
+  private func postLXCStatusAction(
+    node: String,
+    vmid: String,
+    action: String,
+    form: [String: String] = [:]
+  ) async throws -> String {
+    let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
+    let vmidEnc = vmid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? vmid
+    let url = try makeURL(
+      path: "/api2/json/nodes/\(nodeEnc)/lxc/\(vmidEnc)/status/\(action)"
+    )
+    let (data, resp) = try await dataPOSTForm(url, form: form)
+    try ensureOK(resp, data)
+    do { return try JSONDecoder().decode(ProxmoxTaskUPIDResponse.self, from: data).data }
+    catch { throw ProxmoxClientError.decodingFailed(underlying: error) }
+  }
+
+  // MARK: - LXC Detail
+
+  func fetchLXCDetail(node: String, vmid: String) async throws -> ProxmoxVMDetail {
+    let nodeEnc = node.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? node
+    let vmidEnc = vmid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? vmid
+    let url = try makeURL(
+      path: "/api2/json/nodes/\(nodeEnc)/lxc/\(vmidEnc)/status/current"
+    )
+    let (data, resp) = try await dataGET(url)
+    try ensureOK(resp, data)
+    do {
+      return try JSONDecoder().decode(VMDetailResponse.self, from: data).data
+    } catch {
+      throw ProxmoxClientError.decodingFailed(underlying: error)
+    }
+  }
 }
+
+// MARK: - JSONAny helper
 
 struct JSONAny: Decodable {
   let value: Any
@@ -407,5 +666,58 @@ struct JSONAny: Decodable {
     if let s = try? c.decode(String.self) { value = s; return }
     if c.decodeNil() { value = NSNull(); return }
     value = ""
+  }
+}
+
+// MARK: - Containers (Cluster list + enrichment)
+
+extension ProxmoxClient {
+  func fetchAllContainers() async throws -> [ProxmoxContainer] {
+    // 1) Get all resources from cluster (vmid is used for both VMs and containers)
+    let listURL = try makeURL(path: "/api2/json/cluster/resources")
+    let (listData, listResp) = try await dataGET(listURL)
+    try ensureOK(listResp, listData)
+    
+    // 2) Decode all resources and filter for LXC containers (type == "lxc")
+    let allResources: VMListResponse
+    do {
+      allResources = try JSONDecoder().decode(VMListResponse.self, from: listData)
+    } catch {
+      throw ProxmoxClientError.decodingFailed(underlying: error)
+    }
+    
+    // Filter for LXC containers (type == "lxc")
+    let containerResources = allResources.data.filter { $0.type == "lxc" }
+    if containerResources.isEmpty { return [] }
+
+    // 3) For each container, fetch details from /api2/json/nodes/{node}/lxc/{vmid}/status/current
+    let detailTasks = containerResources.map { item in
+      Task { () -> ProxmoxContainer? in
+        do {
+          let d = try await self.fetchLXCDetail(node: item.node, vmid: item.vmid)
+          return ProxmoxContainer(
+            vmid: item.vmid,
+            name: item.name,
+            node: item.node,
+            status: item.status,
+            cpus: d.cpus,
+            maxmem: d.maxmem,
+            mem: d.mem,
+            uptime: d.uptime,
+            netin: d.netin,
+            netout: d.netout,
+            tags: item.tags
+          )
+        } catch {
+          return nil
+        }
+      }
+    }
+
+    var containers: [ProxmoxContainer] = []
+    for t in detailTasks {
+      if let ct = await t.value { containers.append(ct) }
+    }
+    return containers
   }
 }

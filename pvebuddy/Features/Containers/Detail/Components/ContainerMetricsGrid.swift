@@ -1,5 +1,5 @@
 //
-//  VmMetricsGrid.swift
+//  ContainerMetricsGrid.swift
 //  pvebuddy
 //
 //  Created by Oliver Steiner on 01.12.2025.
@@ -7,11 +7,11 @@
 
 import SwiftUI
 
-struct VmMetricsGrid: View {
+struct ContainerMetricsGrid: View {
     let cpuPercent: Double
     let memUsedBytes: Int64
     let memTotalBytes: Int64
-    let vmCPUs: Int
+    let containerCPUs: Int
     @AppStorage("metric_cpu_absolute") private var showCpuAbsolute: Bool = false
     @AppStorage("metric_mem_absolute") private var showMemAbsolute: Bool = true
 
@@ -31,7 +31,7 @@ struct VmMetricsGrid: View {
                 } label: {
                     liveMetricCard(
                         title: "CPU Usage",
-                        value: cpuValueText(percent: cpuPercent, cpus: vmCPUs, absolute: showCpuAbsolute),
+                        value: cpuValueText(percent: cpuPercent, cpus: containerCPUs, absolute: showCpuAbsolute),
                         progress: cpuPercent / 100.0,
                         accentColor: .blue,
                         systemImage: "cpu"
@@ -60,7 +60,7 @@ struct VmMetricsGrid: View {
     private func cpuValueText(percent: Double, cpus: Int, absolute: Bool) -> String {
         if absolute {
             let used = Int(max(0, min(Double(cpus), round((percent / 100.0) * Double(cpus)))))
-            return "\(used)/\(cpus) vCPU"
+            return "\(used)/\(cpus) CPU"
         } else {
             return "\(Int(percent))%"
         }

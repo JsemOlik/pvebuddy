@@ -23,11 +23,15 @@ struct ProxmoxNodeStatus: Decodable {
     cpu = (try? c.decode(Double.self, forKey: .cpu)) ?? 0
     if let memValue = try? c.decode(Int64.self, forKey: .mem),
        let maxmemValue = try? c.decode(Int64.self, forKey: .maxmem) {
-      mem = memValue; maxmem = maxmemValue
+      mem = memValue
+      maxmem = maxmemValue
     } else if let mc = try? c.nestedContainer(keyedBy: MemoryKeys.self, forKey: .memory) {
       mem = (try? mc.decode(Int64.self, forKey: .used)) ?? 0
       maxmem = (try? mc.decode(Int64.self, forKey: .total)) ?? 0
-    } else { mem = 0; maxmem = 0 }
+    } else {
+      mem = 0
+      maxmem = 0
+    }
     swap = (try? c.decode(Int64.self, forKey: .swap)) ?? 0
     maxswap = (try? c.decode(Int64.self, forKey: .maxswap)) ?? 0
     let rawWait = (try? c.decode(Double.self, forKey: .wait)) ?? 0
@@ -35,7 +39,12 @@ struct ProxmoxNodeStatus: Decodable {
   }
 
   init(cpu: Double, mem: Int64, maxmem: Int64, swap: Int64, maxswap: Int64, wait: Double) {
-    self.cpu = cpu; self.mem = mem; self.maxmem = maxmem; self.swap = swap; self.maxswap = maxswap; self.wait = wait
+    self.cpu = cpu
+    self.mem = mem
+    self.maxmem = maxmem
+    self.swap = swap
+    self.maxswap = maxswap
+    self.wait = wait
   }
 }
 
@@ -60,9 +69,13 @@ struct ProxmoxVMListItem: Decodable {
 
   init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
-    if let intVmid = try? c.decode(Int.self, forKey: .vmid) { vmid = String(intVmid) }
-    else if let strVmid = try? c.decode(String.self, forKey: .vmid) { vmid = strVmid }
-    else { vmid = "" }
+    if let intVmid = try? c.decode(Int.self, forKey: .vmid) {
+      vmid = String(intVmid)
+    } else if let strVmid = try? c.decode(String.self, forKey: .vmid) {
+      vmid = strVmid
+    } else {
+      vmid = ""
+    }
     name = (try? c.decode(String.self, forKey: .name)) ?? ""
     node = (try? c.decode(String.self, forKey: .node)) ?? ""
     status = (try? c.decode(String.self, forKey: .status)) ?? "unknown"
@@ -83,9 +96,13 @@ struct ProxmoxVMDetail: Decodable {
 
   init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
-    if let cp = try? c.decode(Int.self, forKey: .cpus) { cpus = cp }
-    else if let cp = try? c.decode(Int.self, forKey: .maxcpu) { cpus = cp }
-    else { cpus = 0 }
+    if let cp = try? c.decode(Int.self, forKey: .cpus) {
+      cpus = cp
+    } else if let cp = try? c.decode(Int.self, forKey: .maxcpu) {
+      cpus = cp
+    } else {
+      cpus = 0
+    }
     maxmem = (try? c.decode(Int64.self, forKey: .maxmem)) ?? 0
     mem = (try? c.decode(Int64.self, forKey: .mem)) ?? 0
     uptime = try? c.decode(Int64.self, forKey: .uptime)
@@ -95,6 +112,21 @@ struct ProxmoxVMDetail: Decodable {
 }
 
 struct ProxmoxVM: Decodable, Identifiable {
+  var id: String { vmid }
+  let vmid: String
+  let name: String
+  let node: String
+  let status: String
+  let cpus: Int
+  let maxmem: Int64
+  let mem: Int64
+  let uptime: Int64?
+  let netin: Int64?
+  let netout: Int64?
+  let tags: String?
+}
+
+struct ProxmoxContainer: Decodable, Identifiable {
   var id: String { vmid }
   let vmid: String
   let name: String
