@@ -405,7 +405,7 @@ final class ProxmoxClient {
     if let memoryMiB { form["memory"] = String(memoryMiB) }
     if let swapMiB { form["swap"] = String(swapMiB) }
 
-    let (data, resp) = try await dataPOSTForm(url, form: form)
+    let (data, resp) = try await dataPUTForm(url, form: form)
     try ensureOK(resp, data)
   }
 
@@ -505,6 +505,28 @@ final class ProxmoxClient {
   ) async throws -> (Data, URLResponse) {
     var req = URLRequest(url: url)
     req.httpMethod = "POST"
+    applyAuth(&req)
+    if !form.isEmpty {
+      req.setValue(
+        "application/x-www-form-urlencoded; charset=utf-8",
+        forHTTPHeaderField: "Content-Type"
+      )
+      let body = form
+        .map { k, v in
+          "\(k)=\(v.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? v)"
+        }
+        .joined(separator: "&")
+      req.httpBody = body.data(using: .utf8)
+    }
+    return try await URLSession.shared.data(for: req)
+  }
+
+  private func dataPUTForm(
+    _ url: URL,
+    form: [String: String] = [:]
+  ) async throws -> (Data, URLResponse) {
+    var req = URLRequest(url: url)
+    req.httpMethod = "PUT"
     applyAuth(&req)
     if !form.isEmpty {
       req.setValue(
