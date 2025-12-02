@@ -31,6 +31,17 @@ struct EditResourcesSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section(header: Text("General")) {
+                    TextField("Name", text: $name)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                }
+
+                Section(header: Text("Boot Options")) {
+                    Toggle("Start at boot", isOn: $startAtBoot)
+                    Toggle("Freeze CPU at startup", isOn: $freezeCPU)
+                }
+
                 if let ns = viewModel.nodeStatus {
                     Section(header: Text("Node capacity")) {
                         let nodeUsedGB = Double(ns.mem) / 1024 / 1024 / 1024
@@ -41,17 +52,6 @@ struct EditResourcesSheet: View {
                         Text(String(format: "CPU wait: %.0f%%", ns.wait))
                             .font(.footnote)
                     }
-                }
-
-                Section(header: Text("General")) {
-                    TextField("Name", text: $name)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                }
-
-                Section(header: Text("Boot Options")) {
-                    Toggle("Start at boot", isOn: $startAtBoot)
-                    Toggle("Freeze CPU at startup", isOn: $freezeCPU)
                 }
 
                 Section(header: Text("vCPU")) {

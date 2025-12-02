@@ -68,6 +68,13 @@ struct VmDetailView: View {
                         onEditResources: { showEditResources = true }
                     )
 
+                    VmStorageSection(
+                        storages: viewModel.storages,
+                        loading: viewModel.storagesLoading,
+                        error: viewModel.storagesError,
+                        onReload: { Task { await viewModel.loadStorages() } }
+                    )
+
                     VmHardwareSection(
                         isExpanded: $showHardware,
                         loading: viewModel.hardwareLoading,
@@ -139,6 +146,7 @@ struct VmDetailView: View {
             Task {
                 await viewModel.refresh()
                 await viewModel.loadHardware()
+                await viewModel.loadStorages()
             }
         }
         .onDisappear { viewModel.stopAutoRefresh() }

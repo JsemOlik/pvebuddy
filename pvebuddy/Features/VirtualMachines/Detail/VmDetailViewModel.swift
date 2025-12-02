@@ -38,6 +38,10 @@ final class VMDetailViewModel: ObservableObject {
   @Published var hardwareLoading: Bool = false
   @Published var hardwareError: String?
 
+  @Published var storages: [ProxmoxStorage] = []
+  @Published var storagesLoading: Bool = false
+  @Published var storagesError: String?
+
   struct HardwareItem: Identifiable { let id = UUID(); let key: String; let value: String }
   struct HardwareSection: Identifiable { let id = UUID(); let title: String; let items: [HardwareItem] }
 
@@ -288,6 +292,23 @@ final class VMDetailViewModel: ObservableObject {
       return (onboot, freeze)
     } catch {
       return (false, false)
+    }
+  }
+
+  func loadStorages() async {
+    guard !storagesLoading else { return }
+    storagesLoading = true
+    storagesError = nil
+    defer { storagesLoading = false }
+
+    do {
+      var allStorages = try await self.client.fetchStorages(for: self.initialVM.node)
+      // Sort by available space (least to most)
+      allStorages.sort { $0.avail < $1.avail }
+      self.storages = allStorages
+    } catch {
+      self.storages = []
+      self.storagesError = "Failed to load storages: \(error.localizedDescription)"
     }
   }
 
