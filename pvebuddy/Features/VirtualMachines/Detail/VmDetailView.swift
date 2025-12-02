@@ -76,29 +76,6 @@ struct VmDetailView: View {
                         onReload: { Task { await viewModel.loadStorages() } }
                     )
 
-                    // Mode Toggle
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("View Mode")
-                                .font(.headline)
-                            Text(isExpertMode ? "Expert mode shows raw hardware data" : "Simple mode shows formatted hardware")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Toggle("", isOn: $isExpertMode)
-                            .labelsHidden()
-                    }
-                    .padding(16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color(.systemBackground))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(Color(.separator).opacity(0.3), lineWidth: 0.5)
-                    )
-
                     if isExpertMode {
                         VmHardwareSection(
                             isExpanded: $showHardware,

@@ -173,7 +173,7 @@ struct VMsView: View {
           )
           .frame(width: 26, height: 26)
           .overlay(
-            Image(systemName: "cube.transparent")
+            Image(systemName: "display")
               .font(.system(size: 14, weight: .semibold))
               .foregroundStyle(.white)
           )

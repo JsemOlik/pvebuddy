@@ -13,6 +13,7 @@ struct SettingsView: View {
     @AppStorage("pve_token_id") private var storedTokenID: String = ""
     @AppStorage("pve_token_secret") private var storedTokenSecret: String = ""
     @AppStorage("has_onboarded") private var hasOnboarded: Bool = false
+    @AppStorage("hardware_expert_mode") private var hardwareExpertMode: Bool = false
 
     @State private var showClearDataAlert = false
 
@@ -43,6 +44,13 @@ struct SettingsView: View {
                 } label: {
                     Label("Web console login", systemImage: "terminal")
                 }
+            }
+            
+            Section(header: Text("Display"), footer: Text("Choose how hardware information is displayed in VM and container detail views.")) {
+                Toggle(isOn: $hardwareExpertMode) {
+                    Label("Expert mode", systemImage: "gearshape.2")
+                }
+                .tint(.blue)
             }
 
             Section {
