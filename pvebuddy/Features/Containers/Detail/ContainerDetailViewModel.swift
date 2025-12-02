@@ -30,7 +30,7 @@ final class ContainerDetailViewModel: ObservableObject {
     let memTotalBytes: Int64
   }
   @Published var chartPoints: [ChartPoint] = []
-  private let maxChartSeconds: TimeInterval = 120
+  private let maxChartSeconds: TimeInterval = 60 // Keep 1 minute of data for graphs
 
   @Published var nodeStatus: ProxmoxNodeStatus?
 
