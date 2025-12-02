@@ -68,6 +68,8 @@ struct VmDetailView: View {
                         onConsole: { Task { await openConsole() } },
                         onEditResources: { showEditResources = true }
                     )
+                    
+                    VmUsageGraphsView(chartPoints: viewModel.chartPoints)
 
                     VmStorageSection(
                         disks: viewModel.vmDisks,

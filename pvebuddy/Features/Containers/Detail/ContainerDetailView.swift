@@ -68,6 +68,8 @@ struct ContainerDetailView: View {
                         onConsole: { Task { await openConsole() } },
                         onEditResources: { showEditResources = true }
                     )
+                    
+                    ContainerUsageGraphsView(chartPoints: viewModel.chartPoints)
 
                     ContainerStorageSection(
                         disks: viewModel.containerDisks,
