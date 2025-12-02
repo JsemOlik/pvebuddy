@@ -57,7 +57,9 @@ private struct TagBadgesView: View {
     }
     
     private func parseTags(_ tagsString: String) -> [String] {
-        tagsString.split(separator: ",")
+        // Handle both comma and semicolon separators
+        let separators = CharacterSet(charactersIn: ",;")
+        return tagsString.components(separatedBy: separators)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
     }
