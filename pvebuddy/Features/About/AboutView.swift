@@ -18,10 +18,10 @@ struct AboutView: View {
         VStack(spacing: 20) {
             Spacer()
 
-            Image("ProxmoxLogo")
+            Image("pve_buddy_logo_no_bg")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 80, height: 80)
+                .frame(width: 180, height: 180)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .shadow(radius: 4)
 
