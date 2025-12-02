@@ -38,6 +38,17 @@ final class ContainerDetailViewModel: ObservableObject {
   @Published var hardwareLoading: Bool = false
   @Published var hardwareError: String?
   @Published var rawConfig: [String: String] = [:]
+  
+  struct ContainerDisk: Identifiable {
+    let id: String
+    let device: String // e.g., "rootfs", "mp0"
+    let storage: String
+    let size: Int64? // in bytes, if available
+    let rawValue: String
+  }
+  @Published var containerDisks: [ContainerDisk] = []
+  @Published var storagesLoading: Bool = false
+  @Published var storagesError: String?
 
   struct HardwareItem: Identifiable { let id = UUID(); let key: String; let value: String }
   struct HardwareSection: Identifiable { let id = UUID(); let title: String; let items: [HardwareItem] }
@@ -348,7 +359,12 @@ final class ContainerDetailViewModel: ObservableObject {
 
   // MARK: - Resource updates
 
-  func updateResources(newCores: Int?, newMemoryMiB: Int?, newSwapMiB: Int?) async -> String? {
+  func updateResources(
+    newCores: Int?,
+    newMemoryMiB: Int?,
+    newSwapMiB: Int?,
+    onboot: Bool?
+  ) async -> String? {
     await withActionState { [weak self] in
       guard let self else { return }
       try await self.client.updateLXCResources(
@@ -356,10 +372,124 @@ final class ContainerDetailViewModel: ObservableObject {
         vmid: self.initialContainer.vmid,
         cores: newCores,
         memoryMiB: newMemoryMiB,
-        swapMiB: newSwapMiB
+        swapMiB: newSwapMiB,
+        onboot: onboot
       )
       await self.refresh()
     }
     return self.errorMessage
+  }
+
+  func fetchBootConfig() async -> Bool {
+    do {
+      let cfg = try await self.client.fetchLXCConfig(
+        node: self.initialContainer.node,
+        vmid: self.initialContainer.vmid
+      )
+      return cfg["onboot"] == "1"
+    } catch {
+      return false
+    }
+  }
+
+  func loadStorages() async {
+    guard !storagesLoading else { return }
+    storagesLoading = true
+    storagesError = nil
+    defer { storagesLoading = false }
+
+    do {
+      let cfg = try await self.client.fetchLXCConfig(
+        node: self.initialContainer.node,
+        vmid: self.initialContainer.vmid
+      )
+      
+      // Parse storage from config (rootfs, mp0, mp1, etc.)
+      var disks: [ContainerDisk] = []
+      
+      // Check for rootfs
+      if let rootfs = cfg["rootfs"] {
+        let parsed = parseContainerDiskConfig(key: "rootfs", value: rootfs)
+        disks.append(parsed)
+      }
+      
+      // Check for mount points (mp0, mp1, mp2, etc.)
+      for (key, value) in cfg {
+        if key.hasPrefix("mp") {
+          let parsed = parseContainerDiskConfig(key: key, value: value)
+          disks.append(parsed)
+        }
+      }
+      
+      // Sort by size (least to most) if available, otherwise by device name
+      disks.sort { disk1, disk2 in
+        if let size1 = disk1.size, let size2 = disk2.size {
+          return size1 < size2
+        }
+        return disk1.device < disk2.device
+      }
+      
+      self.containerDisks = disks
+    } catch {
+      self.containerDisks = []
+      self.storagesError = "Failed to load storage: \(error.localizedDescription)"
+    }
+  }
+
+  private func parseContainerDiskConfig(key: String, value: String) -> ContainerDisk {
+    // Parse container storage config like "local:subvol-100-disk-0,size=8G"
+    // or "local-lvm:subvol-100-disk-0"
+    var storage = ""
+    var size: Int64? = nil
+    
+    // Extract storage and size
+    if let colonIndex = value.firstIndex(of: ":") {
+      storage = String(value[..<colonIndex])
+      let afterColon = String(value[value.index(after: colonIndex)...])
+      
+      // Check for size parameter
+      let components = afterColon.split(separator: ",")
+      for component in components {
+        let trimmed = component.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("size=") {
+          let sizeStr = String(trimmed.dropFirst(5)) // Remove "size="
+          size = parseSize(sizeStr)
+          break
+        }
+      }
+    } else {
+      storage = value
+    }
+    
+    return ContainerDisk(
+      id: key,
+      device: key,
+      storage: storage,
+      size: size,
+      rawValue: value
+    )
+  }
+
+  private func parseSize(_ sizeStr: String) -> Int64? {
+    // Parse size like "32G", "500M", "1T"
+    let trimmed = sizeStr.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    
+    let lastChar = trimmed.last?.lowercased()
+    guard let multiplier = lastChar else { return nil }
+    
+    let numberStr = String(trimmed.dropLast())
+    guard let number = Double(numberStr) else { return nil }
+    
+    let bytes: Double
+    switch multiplier {
+    case "k": bytes = number * 1024
+    case "m": bytes = number * 1024 * 1024
+    case "g": bytes = number * 1024 * 1024 * 1024
+    case "t": bytes = number * 1024 * 1024 * 1024 * 1024
+    default: return nil
+    }
+    
+    return Int64(bytes)
   }
 }

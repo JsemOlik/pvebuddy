@@ -27,6 +27,7 @@ struct ContainerDetailView: View {
     @State private var consoleError: String? = nil
 
     @State private var showEditResources = false
+    @AppStorage("hardware_expert_mode") private var isExpertMode: Bool = false
 
     init(container: ProxmoxContainer, serverAddress: String, onBack: @escaping () -> Void) {
         self.initialContainer = container
@@ -68,13 +69,52 @@ struct ContainerDetailView: View {
                         onEditResources: { showEditResources = true }
                     )
 
-                    ContainerHardwareSection(
-                        isExpanded: $showHardware,
-                        loading: viewModel.hardwareLoading,
-                        error: viewModel.hardwareError,
-                        hardware: viewModel.hardware,
-                        onReload: { Task { await viewModel.loadHardware() } }
+                    ContainerStorageSection(
+                        disks: viewModel.containerDisks,
+                        loading: viewModel.storagesLoading,
+                        error: viewModel.storagesError,
+                        onReload: { Task { await viewModel.loadStorages() } }
                     )
+
+                    // Mode Toggle
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("View Mode")
+                                .font(.headline)
+                            Text(isExpertMode ? "Expert mode shows raw resource data" : "Simple mode shows formatted resources")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Toggle("", isOn: $isExpertMode)
+                            .labelsHidden()
+                    }
+                    .padding(16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color(.systemBackground))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(Color(.separator).opacity(0.3), lineWidth: 0.5)
+                    )
+
+                    if isExpertMode {
+                        ContainerHardwareSection(
+                            isExpanded: $showHardware,
+                            loading: viewModel.hardwareLoading,
+                            error: viewModel.hardwareError,
+                            hardware: viewModel.hardware,
+                            onReload: { Task { await viewModel.loadHardware() } }
+                        )
+                    } else {
+                        ContainerFormattedHardwareView(
+                            hardware: viewModel.hardware,
+                            loading: viewModel.hardwareLoading,
+                            error: viewModel.hardwareError,
+                            onReload: { Task { await viewModel.loadHardware() } }
+                        )
+                    }
 
                     if let err = viewModel.errorMessage { errorBanner(err) }
                     if let cerr = consoleError { errorBanner("Console: \(cerr)") }
@@ -139,6 +179,7 @@ struct ContainerDetailView: View {
             Task {
                 await viewModel.refresh()
                 await viewModel.loadHardware()
+                await viewModel.loadStorages()
             }
         }
         .onDisappear { viewModel.stopAutoRefresh() }

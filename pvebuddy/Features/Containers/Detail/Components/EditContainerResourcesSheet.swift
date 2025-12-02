@@ -14,8 +14,10 @@ struct EditContainerResourcesSheet: View {
     @State private var cores: Int = 1
     @State private var memoryGB: Double = 1.0
     @State private var swapGB: Double = 0.0
+    @State private var startAtBoot: Bool = false
     @State private var isSaving = false
     @State private var saveError: String?
+    @State private var isLoadingConfig: Bool = false
 
     private let minMemoryGB: Double = 0.5
     private let maxMemoryGB: Double = 64
@@ -26,6 +28,10 @@ struct EditContainerResourcesSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section(header: Text("Boot Options")) {
+                    Toggle("Start at boot", isOn: $startAtBoot)
+                }
+
                 if let ns = viewModel.nodeStatus {
                     Section(header: Text("Node capacity")) {
                         let nodeUsedGB = Double(ns.mem) / 1024 / 1024 / 1024
@@ -105,7 +111,7 @@ struct EditContainerResourcesSheet: View {
                     Button(isSaving ? "Saving…" : "Save") {
                         Task { await save() }
                     }
-                    .disabled(isSaving || (cores < 1) || (memoryGB < minMemoryGB))
+                    .disabled(isSaving || isLoadingConfig || (cores < 1) || (memoryGB < minMemoryGB))
                 }
             }
             .onAppear {
@@ -138,6 +144,7 @@ struct EditContainerResourcesSheet: View {
                 }
                 
                 startLiveNodeTicker()
+                Task { await loadContainerConfig() }
             }
             .onDisappear {
                 stopLiveNodeTicker()
@@ -154,10 +161,19 @@ struct EditContainerResourcesSheet: View {
         let err = await viewModel.updateResources(
             newCores: cores,
             newMemoryMiB: memMiB,
-            newSwapMiB: swapMiB
+            newSwapMiB: swapMiB,
+            onboot: startAtBoot
         )
         isSaving = false
         if let err { saveError = err } else { dismiss() }
+    }
+
+    private func loadContainerConfig() async {
+        isLoadingConfig = true
+        defer { isLoadingConfig = false }
+        
+        let onboot = await viewModel.fetchBootConfig()
+        startAtBoot = onboot
     }
 
     private func startLiveNodeTicker() {
