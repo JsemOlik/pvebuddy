@@ -149,8 +149,8 @@ struct VMsView: View {
           await viewModel.refresh()
         }
       }
-      .onChange(of: selectedProxmoxVM) { _, new in
-        if new != nil {
+      .onChange(of: selectedProxmoxVM?.id) { _, newId in
+        if newId != nil {
           viewModel.stopAutoRefresh()
         } else {
           viewModel.startAutoRefresh()
