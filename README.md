@@ -63,7 +63,7 @@ A clean, privacy‑respecting iOS app for monitoring and managing your Proxmox V
 
 ## License
 
-MIT — see LICENSE.
+GNU GENERAL PUBLIC LICENSE — see COPYING.
 
 ## Credits
 

@@ -92,4 +92,4 @@ Do not submit real tokens, passwords, or server URLs. If you spot a security iss
 
 ## License
 
-By contributing, you agree your contributions are MIT licensed as part of this repo.
+By contributing, you agree your contributions are GNU licensed as part of this repo.
