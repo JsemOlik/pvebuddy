@@ -144,7 +144,19 @@ struct VMsView: View {
         Task { await viewModel.refresh() }
       }
       .onDisappear { viewModel.stopAutoRefresh() }
-      .refreshable { await viewModel.refresh() }
+      .refreshable {
+        if selectedProxmoxVM == nil {
+          await viewModel.refresh()
+        }
+      }
+      .onChange(of: selectedProxmoxVM) { _, new in
+        if new != nil {
+          viewModel.stopAutoRefresh()
+        } else {
+          viewModel.startAutoRefresh()
+          Task { await viewModel.refresh() }
+        }
+      }
     }
   }
 
