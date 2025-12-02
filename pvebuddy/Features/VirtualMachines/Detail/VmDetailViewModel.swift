@@ -277,6 +277,20 @@ final class VMDetailViewModel: ObservableObject {
     }
   }
 
+  func fetchBootConfig() async -> (onboot: Bool, freeze: Bool) {
+    do {
+      let cfg = try await self.client.fetchVMConfig(
+        node: self.initialVM.node,
+        vmid: self.initialVM.vmid
+      )
+      let onboot = cfg["onboot"] == "1"
+      let freeze = cfg["freeze"] == "1"
+      return (onboot, freeze)
+    } catch {
+      return (false, false)
+    }
+  }
+
   private static func groupConfig(_ cfg: [String: String]) -> [HardwareSection] {
     func items(_ pairs: [(String, String)]) -> [HardwareItem] { pairs.map { HardwareItem(key: $0.0, value: $0.1) } }
     var sections: [HardwareSection] = []
@@ -349,7 +363,15 @@ final class VMDetailViewModel: ObservableObject {
 
   // MARK: - Resource updates
 
-  func updateResources(newCores: Int?, newSockets: Int?, newMemoryMiB: Int?, newBalloonMiB: Int?) async -> String? {
+  func updateResources(
+    newCores: Int?,
+    newSockets: Int?,
+    newMemoryMiB: Int?,
+    newBalloonMiB: Int?,
+    newName: String?,
+    onboot: Bool?,
+    freeze: Bool?
+  ) async -> String? {
     await withActionState { [weak self] in
       guard let self else { return }
       try await self.client.updateVMResources(
@@ -358,9 +380,28 @@ final class VMDetailViewModel: ObservableObject {
         cores: newCores,
         sockets: newSockets,
         memoryMiB: newMemoryMiB,
-        balloonMiB: newBalloonMiB
+        balloonMiB: newBalloonMiB,
+        name: newName,
+        onboot: onboot,
+        freeze: freeze
       )
       await self.refresh()
+      // Update the VM name in the local model if it was changed
+      if let newName = newName {
+        self.vm = ProxmoxVM(
+          vmid: self.vm.vmid,
+          name: newName,
+          node: self.vm.node,
+          status: self.vm.status,
+          cpus: self.vm.cpus,
+          maxmem: self.vm.maxmem,
+          mem: self.vm.mem,
+          uptime: self.vm.uptime,
+          netin: self.vm.netin,
+          netout: self.vm.netout,
+          tags: self.vm.tags
+        )
+      }
     }
     return self.errorMessage
   }
