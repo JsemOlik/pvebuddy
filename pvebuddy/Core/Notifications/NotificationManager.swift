@@ -35,6 +35,8 @@ final class NotificationManager {
     
     /// Send a notification for a VM power-off event
     func notifyVMPoweredOff(vmName: String, node: String) {
+        print("📬 Preparing notification for VM: \(vmName) on \(node)")
+        
         let content = UNMutableNotificationContent()
         content.title = "VM Powered Off"
         content.body = "\(vmName) on \(node) has powered off"
@@ -48,8 +50,9 @@ final class NotificationManager {
             "node": node
         ]
         
+        let identifier = "vm_power_off_\(vmName)_\(Date().timeIntervalSince1970)"
         let request = UNNotificationRequest(
-            identifier: "vm_power_off_\(vmName)_\(Date().timeIntervalSince1970)",
+            identifier: identifier,
             content: content,
             trigger: nil // Immediate notification
         )
@@ -57,6 +60,8 @@ final class NotificationManager {
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
                 print("❌ Failed to send notification: \(error)")
+            } else {
+                print("✅ Notification sent successfully: \(identifier)")
             }
         }
     }

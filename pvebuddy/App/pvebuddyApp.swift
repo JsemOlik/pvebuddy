@@ -22,16 +22,40 @@
 // along with this program. If not, see https://www.gnu.org/licenses/.
 
 import SwiftUI
+import UserNotifications
 
 @main
 struct pvebuddyApp: App {
     @AppStorage("has_onboarded") private var hasOnboarded: Bool = false
+    @AppStorage("notifications_enabled") private var notificationsEnabled: Bool = false
+    @AppStorage("pve_server_address") private var serverAddress: String = ""
+    
+    private let notificationDelegate = NotificationDelegate()
+    
+    init() {
+        // Set up notification delegate
+        UNUserNotificationCenter.current().delegate = notificationDelegate
+    }
+    
     var body: some Scene {
         WindowGroup {
             if hasOnboarded {
                 MainTabView()
             } else {
                 OnboardingView()
+            }
+        }
+        .onChange(of: hasOnboarded) { _, newValue in
+            if newValue {
+                // Start monitoring if notifications are enabled
+                Task { @MainActor in
+                    if notificationsEnabled && !serverAddress.isEmpty {
+                        let authStatus = await NotificationManager.shared.checkAuthorizationStatus()
+                        if authStatus == .authorized {
+                            VMMonitorService.shared.startMonitoring(serverAddress: serverAddress)
+                        }
+                    }
+                }
             }
         }
     }

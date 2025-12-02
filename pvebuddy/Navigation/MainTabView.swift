@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct MainTabView: View {
     @AppStorage("pve_server_address") private var storedServerAddress: String = ""
@@ -75,6 +76,12 @@ struct MainTabView: View {
                 }
             } else if newValue.isEmpty {
                 VMMonitorService.shared.stopMonitoring()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            // Restart monitoring when app comes to foreground
+            Task {
+                await startMonitoringIfNeeded()
             }
         }
     }

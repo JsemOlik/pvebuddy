@@ -115,6 +115,21 @@ final class ProxmoxClient {
 
   // MARK: - VMs (QEMU)
 
+  /// Fetch VM list with statuses only (no detail fetching) - useful for monitoring
+  func fetchVMListWithStatuses() async throws -> [ProxmoxVMListItem] {
+    let listUrl = try makeURL(path: "/api2/json/cluster/resources?type=vm")
+    var req = URLRequest(url: listUrl)
+    req.httpMethod = "GET"
+    applyAuth(&req)
+    let (listData, listResponse) = try await URLSession.shared.data(for: req)
+    try ensureOK(listResponse, listData)
+
+    let listDecoded: VMListResponse
+    do { listDecoded = try JSONDecoder().decode(VMListResponse.self, from: listData) }
+    catch { throw ProxmoxClientError.decodingFailed(underlying: error) }
+    return listDecoded.data
+  }
+
   func fetchAllVMs() async throws -> [ProxmoxVM] {
     let listUrl = try makeURL(path: "/api2/json/cluster/resources?type=vm")
     var req = URLRequest(url: listUrl)
@@ -146,6 +161,7 @@ final class ProxmoxClient {
             tags: item.tags
           )
         } catch {
+          // Silently skip VMs that can't be fetched (e.g., deleted, missing config)
           return nil
         }
       }
