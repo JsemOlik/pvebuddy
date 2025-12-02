@@ -87,16 +87,30 @@ struct MainTabView: View {
     }
     
     private func startMonitoringIfNeeded() async {
+        print("🔍 Checking if monitoring should start...")
+        print("  - Notifications enabled: \(notificationsEnabled)")
+        print("  - Server address: \(storedServerAddress.isEmpty ? "empty" : "set")")
+        
         guard notificationsEnabled && !storedServerAddress.isEmpty else {
+            if !notificationsEnabled {
+                print("  ⚠️ Notifications not enabled, skipping monitoring")
+            }
+            if storedServerAddress.isEmpty {
+                print("  ⚠️ Server address empty, skipping monitoring")
+            }
             return
         }
         
         // Check if we have notification permissions
         let notificationManager = NotificationManager.shared
         let authStatus = await notificationManager.checkAuthorizationStatus()
+        print("  - Notification auth status: \(authStatus.rawValue)")
         
         if authStatus == .authorized {
+            print("  ✅ Starting monitoring...")
             VMMonitorService.shared.startMonitoring(serverAddress: storedServerAddress)
+        } else {
+            print("  ⚠️ Notifications not authorized, cannot start monitoring")
         }
     }
 }

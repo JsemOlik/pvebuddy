@@ -25,28 +25,40 @@ final class VMMonitorService: ObservableObject {
     
     /// Start monitoring VMs for status changes
     func startMonitoring(serverAddress: String) {
-        guard !isMonitoring else {
-            print("⚠️ Monitoring already started, skipping")
+        // Stop existing monitoring if running
+        if isMonitoring {
+            print("⚠️ Monitoring already started, restarting...")
+            stopMonitoring()
+        }
+        
+        guard !serverAddress.isEmpty else {
+            print("❌ Cannot start monitoring: server address is empty")
             return
         }
         
-        print("🚀 Starting VM monitoring service...")
+        print("🚀 Starting VM monitoring service for: \(serverAddress)")
         self.serverAddress = serverAddress
         self.client = ProxmoxClient(baseAddress: serverAddress)
         self.isMonitoring = true
         
-        // Load initial state
-        Task {
-            await loadInitialVMStates()
-        }
-        
-        // Start periodic monitoring
+        // Start periodic monitoring (load initial state first, then start checking)
         monitoringTask = Task { [weak self] in
-            guard let self else { return }
+            guard let self else {
+                print("❌ Monitoring task failed: self is nil")
+                return
+            }
             print("✅ VM monitoring task started")
+            
+            // Load initial state first before starting periodic checks
+            await self.loadInitialVMStates()
+            print("📊 Initial states loaded, starting periodic checks...")
+            
+            var checkCount = 0
             while !Task.isCancelled && self.isMonitoring {
+                checkCount += 1
+                print("🔍 Running check #\(checkCount)...")
                 await self.checkVMStates()
-                try? await Task.sleep(nanoseconds: 5_000_000_000) // Check every 5 seconds
+                try? await Task.sleep(nanoseconds: 3_000_000_000) // Check every 3 seconds
             }
             print("🛑 VM monitoring task stopped")
         }
@@ -81,28 +93,37 @@ final class VMMonitorService: ObservableObject {
     
     /// Check for VM state changes and send notifications
     private func checkVMStates() async {
-        guard let client = client else { return }
+        guard let client = client else {
+            print("⚠️ No client available for monitoring")
+            return
+        }
         
         // Check if notifications are enabled
         let notificationsEnabled = UserDefaults.standard.bool(forKey: "notifications_enabled")
         let notifyStatusChanges = UserDefaults.standard.bool(forKey: "notifications_status_changes")
         
         guard notificationsEnabled && notifyStatusChanges else {
+            if !notificationsEnabled {
+                print("🔕 Notifications disabled, skipping check")
+            } else if !notifyStatusChanges {
+                print("🔕 Status change notifications disabled, skipping check")
+            }
             return
         }
         
         // Check authorization status
         let authStatus = await notificationManager.checkAuthorizationStatus()
         guard authStatus == .authorized else {
-            if authStatus != .authorized {
-                print("🔔 Notifications not authorized, status: \(authStatus.rawValue)")
-            }
+            print("🔔 Notifications not authorized, status: \(authStatus.rawValue)")
             return
         }
+        
+        print("🔍 Checking VM states... (previous states: \(previousVMStates.count))")
         
         do {
             // Use the lightweight endpoint that doesn't fetch details to avoid 500 errors
             let vmItems = try await client.fetchVMListWithStatuses()
+            print("📋 Found \(vmItems.count) VMs in cluster")
             var newStates: [String: String] = [:]
             var vmNames: [String: String] = [:] // Track VM names for notifications
             
@@ -114,20 +135,29 @@ final class VMMonitorService: ObservableObject {
                 
                 // Check if this VM was previously running and is now stopped
                 if let previousStatus = previousVMStates[key] {
-                    // Debug logging
+                    // Debug logging for all status changes
                     if previousStatus != currentStatus {
-                        print("🔄 VM \(item.name) (\(item.vmid)) status changed: \(previousStatus) -> \(currentStatus)")
+                        print("🔄 VM \(item.name) (\(item.vmid)) status changed: '\(previousStatus)' -> '\(currentStatus)'")
                     }
                     
                     // Proxmox uses various status values - check for power-off transitions
+                    // Status can be: "running", "stopped", "stopped (locked)", "paused", "suspended", etc.
                     let wasRunning = previousStatus == "running"
-                    let isStopped = currentStatus == "stopped" || currentStatus == "stopped (locked)"
+                    let isStopped = currentStatus == "stopped" || 
+                                   currentStatus.contains("stopped") ||
+                                   currentStatus == "off"
+                    
+                    print("  - Previous: '\(previousStatus)' (running: \(wasRunning))")
+                    print("  - Current: '\(currentStatus)' (stopped: \(isStopped))")
                     
                     if wasRunning && isStopped {
                         // VM powered off - send notification
                         print("🔔 VM \(item.name) powered off! Sending notification...")
                         notificationManager.notifyVMPoweredOff(vmName: item.name, node: item.node)
                     }
+                } else {
+                    // New VM detected (wasn't in previous states)
+                    print("➕ New VM detected: \(item.name) (\(item.vmid)) - \(currentStatus)")
                 }
             }
             
@@ -143,6 +173,7 @@ final class VMMonitorService: ObservableObject {
             
             // Update previous states
             previousVMStates = newStates
+            print("✅ State check complete. Updated states: \(previousVMStates.count)")
         } catch {
             print("❌ Failed to check VM states: \(error)")
         }

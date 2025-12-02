@@ -42,6 +42,7 @@ final class NotificationManager {
         content.body = "\(vmName) on \(node) has powered off"
         content.sound = .default
         content.categoryIdentifier = "VM_STATUS_CHANGE"
+        content.badge = 1 // Show badge
         
         // Add user info for potential deep linking
         content.userInfo = [
@@ -57,9 +58,10 @@ final class NotificationManager {
             trigger: nil // Immediate notification
         )
         
+        print("📤 Adding notification request: \(identifier)")
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
-                print("❌ Failed to send notification: \(error)")
+                print("❌ Failed to send notification: \(error.localizedDescription)")
             } else {
                 print("✅ Notification sent successfully: \(identifier)")
             }

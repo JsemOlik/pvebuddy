@@ -160,8 +160,19 @@ final class ProxmoxClient {
             netout: d.netout,
             tags: item.tags
           )
-        } catch {
+        } catch let error as ProxmoxClientError {
           // Silently skip VMs that can't be fetched (e.g., deleted, missing config)
+          // Only log if it's not an expected error (500 with "does not exist")
+          if case .requestFailed(let code, let message) = error {
+            if code != 500 || !message.contains("does not exist") {
+              // Log unexpected errors
+              print("⚠️ Failed to fetch details for VM \(item.vmid) on \(item.node): \(message)")
+            }
+          }
+          return nil
+        } catch {
+          // Log other unexpected errors
+          print("⚠️ Unexpected error fetching VM \(item.vmid): \(error.localizedDescription)")
           return nil
         }
       }
@@ -576,8 +587,23 @@ final class ProxmoxClient {
     }
     guard 200..<300 ~= http.statusCode else {
       let body = String(data: data, encoding: .utf8) ?? "<non-UTF8 response>"
-      logger.error("HTTP \(http.statusCode) error: \(body)")
-      NSLog("❌ Proxmox API error (HTTP \(http.statusCode)): %@", body)
+      
+      // Suppress verbose logging for expected errors (e.g., missing VM config files)
+      // These are common when VMs are deleted or in transition states
+      let isExpectedError = http.statusCode == 500 && (
+        body.contains("does not exist") ||
+        body.contains("Configuration file") ||
+        body.contains("not found") ||
+        body.contains("does not exist\n")
+      )
+      
+      if !isExpectedError {
+        // Only log unexpected errors
+        logger.error("HTTP \(http.statusCode) error: \(body)")
+        NSLog("❌ Proxmox API error (HTTP \(http.statusCode)): %@", body)
+      }
+      // For expected errors, we silently skip logging to reduce console noise
+      
       throw ProxmoxClientError.requestFailed(
         statusCode: http.statusCode,
         message: body
