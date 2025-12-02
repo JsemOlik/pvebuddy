@@ -113,13 +113,13 @@ final class VMMonitorService: ObservableObject {
         
         // Check if notifications are enabled
         let notificationsEnabled = UserDefaults.standard.bool(forKey: "notifications_enabled")
-        let notifyStatusChanges = UserDefaults.standard.bool(forKey: "notifications_status_changes")
+        let notifyVMPowerChanges = UserDefaults.standard.bool(forKey: "notifications_vm_power_changes")
         
-        guard notificationsEnabled && notifyStatusChanges else {
+        guard notificationsEnabled && notifyVMPowerChanges else {
             if !notificationsEnabled {
                 print("🔕 Notifications disabled, skipping check")
-            } else if !notifyStatusChanges {
-                print("🔕 Status change notifications disabled, skipping check")
+            } else if !notifyVMPowerChanges {
+                print("🔕 VM power change notifications disabled, skipping check")
             }
             return
         }
