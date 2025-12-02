@@ -10,6 +10,7 @@ import SwiftUI
 struct MainTabView: View {
     @AppStorage("pve_server_address") private var storedServerAddress: String = ""
     @AppStorage("appearance_preference") private var appearancePreference: Int = 0 // 0: System, 1: Light, 2: Dark
+    @AppStorage("notifications_enabled") private var notificationsEnabled: Bool = false
 
     private var preferredScheme: ColorScheme? {
         switch appearancePreference {
@@ -55,6 +56,41 @@ struct MainTabView: View {
         }
         .tint(.blue)
         .preferredColorScheme(preferredScheme)
+        .task {
+            await startMonitoringIfNeeded()
+        }
+        .onChange(of: notificationsEnabled) { _, newValue in
+            if newValue && !storedServerAddress.isEmpty {
+                Task {
+                    await startMonitoringIfNeeded()
+                }
+            } else {
+                VMMonitorService.shared.stopMonitoring()
+            }
+        }
+        .onChange(of: storedServerAddress) { _, newValue in
+            if notificationsEnabled && !newValue.isEmpty {
+                Task {
+                    await startMonitoringIfNeeded()
+                }
+            } else if newValue.isEmpty {
+                VMMonitorService.shared.stopMonitoring()
+            }
+        }
+    }
+    
+    private func startMonitoringIfNeeded() async {
+        guard notificationsEnabled && !storedServerAddress.isEmpty else {
+            return
+        }
+        
+        // Check if we have notification permissions
+        let notificationManager = NotificationManager.shared
+        let authStatus = await notificationManager.checkAuthorizationStatus()
+        
+        if authStatus == .authorized {
+            VMMonitorService.shared.startMonitoring(serverAddress: storedServerAddress)
+        }
     }
 }
 
