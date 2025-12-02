@@ -1,5 +1,5 @@
 //
-//  VmCard.swift
+//  ContainerCard.swift
 //  pvebuddy
 //
 //  Created by Oliver Steiner on 01.12.2025.
@@ -7,16 +7,16 @@
 
 import SwiftUI
 
-struct VmCard: View {
-    let vm: ProxmoxVM
+struct ContainerCard: View {
+    let container: ProxmoxContainer
     
     var body: some View {
-        let memUsedGB = Double(vm.mem) / 1024.0 / 1024.0 / 1024.0
-        let memMaxGB = Double(vm.maxmem) / 1024.0 / 1024.0 / 1024.0
+        let memUsedGB = Double(container.mem) / 1024.0 / 1024.0 / 1024.0
+        let memMaxGB = Double(container.maxmem) / 1024.0 / 1024.0 / 1024.0
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 10) {
-                if let imageName = DistroImageMapper.imageName(from: vm.tags) {
+                if let imageName = DistroImageMapper.imageName(from: container.tags) {
                     Image(imageName)
                         .resizable()
                         .scaledToFill()
@@ -25,17 +25,17 @@ struct VmCard: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(vm.name).font(.subheadline.weight(.semibold))
-                    Text(vm.node).font(.caption).foregroundStyle(.secondary)
+                    Text(container.name).font(.subheadline.weight(.semibold))
+                    Text(container.node).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                VmStatusBadge(status: vm.status)
+                ContainerStatusBadge(status: container.status)
             }
 
             HStack(spacing: 16) {
                 HStack(spacing: 6) {
                     Image(systemName: "cpu").font(.caption).foregroundStyle(.blue)
-                    Text("0/\(vm.cpus) cores")
+                    Text("0/\(container.cpus) cores")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
