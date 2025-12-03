@@ -1,3 +1,6 @@
+
+![Logo](https://github.com/JsemOlik/pvebuddy/blob/main/Assets/banner.png?raw=true)
+
 # PVE Buddy
 
 A clean, privacy‑respecting iOS app for monitoring and managing your Proxmox VE cluster. Built with SwiftUI, Charts, and async/await. No telemetry, no external services — your data stays on your phone.
